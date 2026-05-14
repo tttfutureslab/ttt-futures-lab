@@ -1,0 +1,188 @@
+.splash {
+  position: fixed;
+  inset: 0;
+  background: radial-gradient(circle at center, #2e2e2e 0%, #050505 100%);
+  overflow: hidden;
+  z-index: 1000;
+  perspective: 1000px;
+  transition: opacity 0.7s ease;
+}
+.splash-exiting { opacity: 0; pointer-events: none; }
+
+.splash-overlay {
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px);
+  background-size: 50px 50px;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.splash-glow {
+  position: absolute;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  width: 70vw; height: 70vw;
+  background: radial-gradient(circle, rgba(255,255,255,0.03) 0%, transparent 60%);
+  pointer-events: none;
+  z-index: 1;
+}
+
+.splash-content {
+  position: absolute;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  text-align: center;
+  z-index: 10;
+  color: #fff;
+  width: 90%;
+}
+.splash-content h1 {
+  font-size: 5.5vw;
+  margin: 0;
+  letter-spacing: 0.18em;
+  font-weight: 800;
+  text-transform: uppercase;
+  text-shadow: 0 10px 30px rgba(0,0,0,0.9), 0 0 15px rgba(255,255,255,0.15);
+  animation: elegant-pulse 4s ease-in-out infinite;
+}
+.splash-content h2 {
+  font-size: 2vw;
+  margin-top: 1.5vh;
+  font-weight: 300;
+  color: #d0d0d0;
+  letter-spacing: 0.12em;
+  text-shadow: 0 5px 15px rgba(0,0,0,0.8);
+  animation: float-gentle 6s ease-in-out infinite;
+}
+.tap-hint {
+  margin-top: 3vh;
+  font-size: 1.2vw;
+  letter-spacing: 0.4em;
+  color: rgba(255,255,255,0.5);
+  font-weight: 600;
+  animation: blink 1.8s ease-in-out infinite;
+}
+
+@keyframes elegant-pulse {
+  0%, 100% { text-shadow: 0 10px 30px rgba(0,0,0,0.9), 0 0 10px rgba(255,255,255,0.1); }
+  50% { text-shadow: 0 10px 30px rgba(0,0,0,0.9), 0 0 30px rgba(255,255,255,0.3); }
+}
+@keyframes float-gentle {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-10px); }
+}
+@keyframes blink {
+  0%, 100% { opacity: 0.3; }
+  50% { opacity: 0.9; }
+}
+
+/* Tech rings */
+.tech-ring {
+  position: absolute;
+  border-radius: 50%;
+  border: 1px solid rgba(255,255,255,0.04);
+  pointer-events: none;
+  z-index: 0;
+  top: 50%; left: 50%;
+}
+.ring-wrapper {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+}
+.ring-1 { width: 85vw; height: 85vw; border-style: dashed; }
+.ring-1 .ring-wrapper { animation: spin 180s linear infinite; border-style: dashed; border-width: 2px; border-color: rgba(255,255,255,0.04); }
+.ring-2 { width: 70vw; height: 70vw; }
+.ring-2 .ring-wrapper { animation: spin-reverse 120s linear infinite; border: 1px solid rgba(255,255,255,0.04); border-radius: 50%; }
+.ring-3 { width: 95vw; height: 95vw; border: 2px dotted rgba(255,255,255,0.02); }
+.ring-3 .ring-wrapper { animation: spin 240s linear infinite; }
+
+@keyframes spin { 100% { transform: rotate(360deg); } }
+@keyframes spin-reverse { 100% { transform: rotate(-360deg); } }
+
+/* Particles */
+.particles {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 2;
+}
+.particle {
+  position: absolute;
+  background: #fff;
+  border-radius: 50%;
+  animation: drift linear infinite;
+}
+@keyframes drift {
+  0% { transform: translateY(100vh) translateX(0) scale(0); opacity: 0; }
+  20% { opacity: 0.5; }
+  80% { opacity: 0.5; }
+  100% { transform: translateY(-20vh) translateX(5vw) scale(1); opacity: 0; }
+}
+
+/* Graphics (clock + microscope) */
+.graphic-container {
+  position: absolute;
+  z-index: 5;
+  pointer-events: none;
+  opacity: 0.35;
+  filter: drop-shadow(0 5px 15px rgba(0,0,0,0.5));
+}
+.clock-container {
+  top: -12vw;
+  left: -12vw;
+  width: 48vw;
+  height: 48vw;
+}
+.microscope-container {
+  bottom: -8vw;
+  right: -8vw;
+  width: 42vw;
+  height: 42vw;
+}
+
+.gear-slow { animation: spin 60s linear infinite; transform-origin: 250px 250px; transform-box: fill-box; }
+.gear-medium { animation: spin 30s linear infinite; transform-origin: 250px 250px; transform-box: fill-box; }
+.gear-fast-reverse { animation: spin-reverse 20s linear infinite; transform-origin: 250px 250px; transform-box: fill-box; }
+.knob-spin { animation: spin-reverse 10s linear infinite; transform-origin: 340px 240px; transform-box: fill-box; }
+
+.scan-line {
+  animation: scan-smooth 4s ease-in-out infinite;
+  stroke-width: 4;
+  stroke: #fff;
+}
+@keyframes scan-smooth {
+  0% { transform: translateY(0); opacity: 0.1; }
+  50% { transform: translateY(-60px); opacity: 0.7; }
+  100% { transform: translateY(0); opacity: 0.1; }
+}
+
+/* ═══════════════════════════════════════════════════════
+   Mobile adjustments — el HTML original se rompe en móvil
+   porque las gráficas usan vw (responsive al ancho) y en
+   pantallas estrechas se solapan con el texto. Reescalado:
+   ═══════════════════════════════════════════════════════ */
+@media (max-width: 768px) {
+  .splash-content h1 { font-size: 28px; letter-spacing: 0.15em; }
+  .splash-content h2 { font-size: 12px; margin-top: 12px; }
+  .tap-hint { font-size: 10px; margin-top: 24px; }
+
+  .clock-container {
+    top: -20vw;
+    left: -25vw;
+    width: 75vw;
+    height: 75vw;
+  }
+  .microscope-container {
+    bottom: -15vw;
+    right: -25vw;
+    width: 70vw;
+    height: 70vw;
+  }
+  .ring-1 { width: 110vw; height: 110vw; }
+  .ring-2 { width: 90vw; height: 90vw; }
+  .ring-3 { width: 130vw; height: 130vw; }
+}
