@@ -1,118 +1,169 @@
 import { Router } from 'express';
+import multer from 'multer';
 import { claude, CLAUDE_MODEL } from '../services/claude.js';
 import { query } from '../db/pool.js';
+import { buildSharedContext } from '../services/sharedContext.js';
+import { TOOLS_TRADING, TOOLS_GESTION, TOOLS_BACKTESTING, executeTool } from '../services/tools.js';
 
 const router = Router();
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
 
-const SYSTEM_PROMPT = `Eres el asistente personal de TTT Futures Lab, un laboratorio de trading de futuros NQ basado en metodología ICT.
+const PROMPT_BASE = `Eres el asistente de TTT Futures Lab, un laboratorio de trading de futuros NQ basado en metodologia ICT.
 
-CONTEXTO DEL USUARIO:
-- Trader operando con prop firms: TopOne Futures, Tradeify, MyFundedFutures
-- Estrategia: v18 manual (TP +$750 / SL -$250 / R:R 3:1)
+CONTEXTO DEL TRADER:
+- Estrategia v18 manual: TP +750 USD / SL -250 USD / R:R 3:1
 - Framework ICT: XAMD/AMDX, CISD (LTF y HTF), IRL/ERL, OTE, BPR, IFVG, Power of Three, Quarters (Q1-Q4)
 - Sesiones: Asia, London, NY AM, NY PM
-- Checklist v18 (6 normas):
-  1. Q3 o Q4 (cuarto de distribución)
-  2. Dirección de tendencia actual
-  3. Retroceso OTE + ERL o IRL tomada
-  4. CISD formado (LTF)
-  5. BPR o IFVG presente
-  6. CISD en HTF
+- Prop firms: TopOne Futures, Tradeify, MyFundedFutures
 
-TU ROL:
-- Responder preguntas sobre normas vigentes de prop firms (drawdown, consistencia, payouts, scaling)
-- Analizar capturas de trades con framework ICT
-- Asesorar sobre gestión de cuentas: consistencia, daily loss, trailing drawdown
-- Hablar en español por defecto
-- Ser directo, técnico, sin rodeos
-- Si te preguntan algo de normas que requiere info muy actual y no tienes contexto suficiente en la BD, dilo y sugiere refrescar normas.`;
+CHECKLIST v18 (6 normas):
+1. Q3 o Q4 (cuarto de distribucion)
+2. Direccion de tendencia actual
+3. Retroceso OTE + ERL o IRL tomada
+4. CISD formado (LTF)
+5. BPR o IFVG presente
+6. CISD en HTF
 
-router.post('/message', async (req, res) => {
+REGLAS:
+- Habla en espanol, directo y tecnico
+- Usa terminologia ICT con naturalidad
+- Cuando uses una herramienta para guardar datos, confirma brevemente que guardaste
+- Tienes acceso a TODO el contexto del trader, usalo`;
+
+const PROMPT_TRADING = PROMPT_BASE + `
+
+TU ROL - CHAT TRADING:
+Analista ICT que valida trades reales en vivo. El usuario te pasa capturas y dice si fue TP/SL/BE/parcial y por que.
+
+1. Analiza la captura tecnicamente
+2. Evalua la decision del usuario
+3. Si fue SL: identifica que se pudo filtrar
+4. Si fue TP: confirma normas cumplidas
+5. SIEMPRE registra con log_trade
+6. Identifica patrones con el tiempo`;
+
+const PROMPT_GESTION = PROMPT_BASE + `
+
+TU ROL - CHAT GESTION:
+Gestionas las cuentas en prop firms. Lees capturas de dashboards o entiendes datos por texto.
+
+1. Captura de dashboard: extrae datos y usa save_account_snapshot
+2. Texto: actualiza con save_account_snapshot
+3. Si la cuenta no existe, crea con create_account primero
+4. Alertas: daily loss >70% ALERTA, trailing DD >80% CRITICO, consistencia >30% riesgo
+5. Conoces trades recientes, intagralos`;
+
+const PROMPT_BACKTESTING = PROMPT_BASE + `
+
+TU ROL - CHAT BACKTESTING v18:
+Registro y analisis del backtest manual (Mar 1 - Abr 1, 2026, NQ).
+
+Estado: 35 trades, +9865 USD, WR 53.3%
+- Asia debil 20% WR
+- NY AM/PM fuertes 75% WR
+- Errores: misidentificacion cuarto, wrong direction, sin XAMD/AMDX
+
+1. Trade nuevo dictado: usa log_backtest_trade
+2. Pregunta de stats: analiza el contexto y responde con numeros
+3. Sugiere insights al detectar patrones
+4. Diferencia clean vs real win rate`;
+
+const PROMPTS_BY_KIND = { trading: PROMPT_TRADING, gestion: PROMPT_GESTION, backtesting: PROMPT_BACKTESTING };
+const TOOLS_BY_KIND = { trading: TOOLS_TRADING, gestion: TOOLS_GESTION, backtesting: TOOLS_BACKTESTING };
+
+router.post('/:kind/message', upload.single('image'), async (req, res) => {
   try {
-    const { session_id, message, include_context = true } = req.body;
-    if (!message) return res.status(400).json({ error: 'message es requerido' });
+    const kind = req.params.kind;
+    if (!['trading', 'gestion', 'backtesting'].includes(kind)) {
+      return res.status(400).json({ error: 'Tipo de chat invalido' });
+    }
+    const message = req.body.message || '';
+    if (!message && !req.file) return res.status(400).json({ error: 'Mensaje vacio' });
 
-    const sid = session_id || `session_${Date.now()}`;
-
-    // Guardar mensaje del usuario
     await query(
-      'INSERT INTO chat_messages (session_id, role, content) VALUES ($1, $2, $3)',
-      [sid, 'user', message]
+      'INSERT INTO chat_messages (session_id, role, content, chat_kind, image_url) VALUES ($1, $2, $3, $4, $5)',
+      [kind + '_main', 'user', message, kind, req.file ? '[image attached]' : null]
     );
 
-    // Recuperar histórico de la sesión
     const history = await query(
-      'SELECT role, content FROM chat_messages WHERE session_id = $1 ORDER BY created_at ASC LIMIT 40',
-      [sid]
+      'SELECT role, content FROM chat_messages WHERE chat_kind = $1 ORDER BY created_at DESC LIMIT 30',
+      [kind]
     );
+    const orderedHistory = history.rows.reverse();
+    const sharedContext = await buildSharedContext();
 
-    // Contexto opcional: cuentas + normas
-    let contextBlock = '';
-    if (include_context) {
-      const accounts = await query(`
-        SELECT a.account_label, pf.name AS firm, a.size_usd, a.status,
-          (SELECT row_to_json(s) FROM (
-            SELECT balance, pnl_today, pnl_total, trailing_dd_now, best_day_pnl
-            FROM snapshots WHERE account_id = a.id ORDER BY snapshot_at DESC LIMIT 1
-          ) s) AS last
-        FROM accounts a JOIN prop_firms pf ON pf.id = a.prop_firm_id
-        WHERE a.status = 'active'
-      `);
+    const messages = orderedHistory.slice(0, -1).map((m) => ({ role: m.role, content: m.content }));
+    const lastUserContent = [];
+    if (req.file) {
+      lastUserContent.push({
+        type: 'image',
+        source: { type: 'base64', media_type: req.file.mimetype, data: req.file.buffer.toString('base64') }
+      });
+    }
+    lastUserContent.push({ type: 'text', text: message || 'Analiza esta captura.' });
+    messages.push({ role: 'user', content: lastUserContent });
 
-      const rules = await query(`
-        SELECT pf.slug, r.category, r.rule_key, r.rule_value
-        FROM rules r JOIN prop_firms pf ON pf.id = r.prop_firm_id
-        WHERE r.is_current = TRUE
-      `);
+    const systemPrompt = PROMPTS_BY_KIND[kind] + '\n\n=== CONTEXTO COMPARTIDO ===\n' + JSON.stringify(sharedContext, null, 2);
 
-      if (accounts.rows.length > 0 || rules.rows.length > 0) {
-        contextBlock = `\n\nESTADO ACTUAL DE TUS CUENTAS:\n${JSON.stringify(accounts.rows, null, 2)}\n\nNORMAS VIGENTES:\n${JSON.stringify(rules.rows, null, 2)}`;
+    let response;
+    const accumulatedToolCalls = [];
+    let safetyCounter = 0;
+
+    while (safetyCounter < 5) {
+      safetyCounter++;
+      response = await claude.messages.create({
+        model: CLAUDE_MODEL,
+        max_tokens: 2500,
+        system: systemPrompt,
+        tools: TOOLS_BY_KIND[kind],
+        messages
+      });
+      if (response.stop_reason !== 'tool_use') break;
+
+      const toolUseBlocks = response.content.filter((c) => c.type === 'tool_use');
+      messages.push({ role: 'assistant', content: response.content });
+      const toolResults = [];
+      for (const tu of toolUseBlocks) {
+        const result = await executeTool(tu.name, tu.input);
+        accumulatedToolCalls.push({ name: tu.name, input: tu.input, result });
+        toolResults.push({ type: 'tool_result', tool_use_id: tu.id, content: JSON.stringify(result) });
       }
+      messages.push({ role: 'user', content: toolResults });
     }
 
-    const messages = history.rows.map((m) => ({ role: m.role, content: m.content }));
+    const assistantText = response.content.filter((c) => c.type === 'text').map((c) => c.text).join('\n');
 
-    const response = await claude.messages.create({
-      model: CLAUDE_MODEL,
-      max_tokens: 2000,
-      system: SYSTEM_PROMPT + contextBlock,
-      messages
-    });
-
-    const assistantText = response.content
-      .filter((c) => c.type === 'text')
-      .map((c) => c.text)
-      .join('');
-
-    // Guardar respuesta
     await query(
-      'INSERT INTO chat_messages (session_id, role, content) VALUES ($1, $2, $3)',
-      [sid, 'assistant', assistantText]
+      'INSERT INTO chat_messages (session_id, role, content, chat_kind, tool_calls) VALUES ($1, $2, $3, $4, $5)',
+      [kind + '_main', 'assistant', assistantText, kind, accumulatedToolCalls.length ? JSON.stringify(accumulatedToolCalls) : null]
     );
 
-    res.json({ session_id: sid, message: assistantText });
+    res.json({ message: assistantText, tool_calls: accumulatedToolCalls });
   } catch (err) {
-    console.error('Chat error:', err);
+    console.error('Chat ' + req.params.kind + ' error:', err);
     res.status(500).json({ error: err.message });
   }
 });
 
-// Historial de una sesión
-router.get('/session/:sid', async (req, res) => {
-  const result = await query(
-    'SELECT role, content, created_at FROM chat_messages WHERE session_id = $1 ORDER BY created_at ASC',
-    [req.params.sid]
-  );
-  res.json(result.rows);
+router.get('/:kind/history', async (req, res) => {
+  try {
+    const result = await query(
+      'SELECT role, content, created_at, image_url FROM chat_messages WHERE chat_kind = $1 ORDER BY created_at ASC LIMIT 200',
+      [req.params.kind]
+    );
+    res.json(result.rows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
-// Listar sesiones
-router.get('/sessions', async (req, res) => {
-  const result = await query(`
-    SELECT session_id, MAX(created_at) AS last_at, COUNT(*) AS msg_count
-    FROM chat_messages GROUP BY session_id ORDER BY last_at DESC LIMIT 50
-  `);
-  res.json(result.rows);
+router.delete('/:kind/history', async (req, res) => {
+  try {
+    await query('DELETE FROM chat_messages WHERE chat_kind = $1', [req.params.kind]);
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 export default router;

@@ -3,11 +3,10 @@ import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import SplashScreen from './components/SplashScreen';
 import LoginScreen from './components/LoginScreen';
 import AppHeader from './components/AppHeader';
-import Dashboard from './pages/Dashboard';
-import UploadShot from './pages/UploadShot';
+import ChatTrading from './pages/ChatTrading';
+import ChatGestion from './pages/ChatGestion';
+import ChatBacktesting from './pages/ChatBacktesting';
 import Rules from './pages/Rules';
-import Chat from './pages/Chat';
-import History from './pages/History';
 import { getAuthStatus } from './lib/api';
 
 export default function App() {
@@ -15,13 +14,7 @@ export default function App() {
 
   useEffect(() => {
     getAuthStatus()
-      .then((res) => {
-        if (res.authenticated) {
-          setPhase('splash');
-        } else {
-          setPhase('login');
-        }
-      })
+      .then((res) => setPhase(res.authenticated ? 'splash' : 'login'))
       .catch(() => setPhase('login'));
   }, []);
 
@@ -33,10 +26,7 @@ export default function App() {
 
   useEffect(() => {
     if (phase !== 'splash') return;
-    const failsafe = setTimeout(() => {
-      console.log('[failsafe] Forzando transicion a app');
-      setPhase('app');
-    }, 5000);
+    const failsafe = setTimeout(() => setPhase('app'), 5000);
     return () => clearTimeout(failsafe);
   }, [phase]);
 
@@ -48,18 +38,13 @@ export default function App() {
         display: 'flex', alignItems: 'center', justifyContent: 'center',
         color: 'rgba(255,255,255,0.4)', fontSize: 11, letterSpacing: '0.3em'
       }}>
-        VERIFICANDO ACCESO…
+        VERIFICANDO ACCESO...
       </div>
     );
   }
 
-  if (phase === 'login') {
-    return <LoginScreen onSuccess={() => setPhase('splash')} />;
-  }
-
-  if (phase === 'splash') {
-    return <SplashScreen mode="auto" onEnter={() => setPhase('app')} />;
-  }
+  if (phase === 'login') return <LoginScreen onSuccess={() => setPhase('splash')} />;
+  if (phase === 'splash') return <SplashScreen mode="auto" onEnter={() => setPhase('app')} />;
 
   return (
     <BrowserRouter>
@@ -68,11 +53,10 @@ export default function App() {
         <AppHeader onLogout={() => setPhase('login')} />
         <main className="main-content">
           <Routes>
-            <Route path="/" element={<Dashboard />} />
-            <Route path="/upload" element={<UploadShot />} />
-            <Route path="/rules" element={<Rules />} />
-            <Route path="/chat" element={<Chat />} />
-            <Route path="/history" element={<History />} />
+            <Route path="/"            element={<ChatTrading />} />
+            <Route path="/gestion"     element={<ChatGestion />} />
+            <Route path="/backtesting" element={<ChatBacktesting />} />
+            <Route path="/rules"       element={<Rules />} />
           </Routes>
         </main>
       </div>
