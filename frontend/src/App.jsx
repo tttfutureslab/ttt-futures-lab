@@ -11,16 +11,13 @@ import History from './pages/History';
 import { getAuthStatus } from './lib/api';
 
 export default function App() {
-  // Fases: 'checking' | 'login' | 'auto-splash' | 'tap-splash' | 'app'
   const [phase, setPhase] = useState('checking');
 
-  // Comprobar sesión al cargar
   useEffect(() => {
     getAuthStatus()
       .then((res) => {
         if (res.authenticated) {
-          // Ya hay sesión activa → splash directo
-          setPhase('auto-splash');
+          setPhase('splash');
         } else {
           setPhase('login');
         }
@@ -28,12 +25,20 @@ export default function App() {
       .catch(() => setPhase('login'));
   }, []);
 
-  // Listener global por si la sesión expira durante la navegación
   useEffect(() => {
     const onUnauth = () => setPhase('login');
     window.addEventListener('auth:unauthorized', onUnauth);
     return () => window.removeEventListener('auth:unauthorized', onUnauth);
   }, []);
+
+  useEffect(() => {
+    if (phase !== 'splash') return;
+    const failsafe = setTimeout(() => {
+      console.log('[failsafe] Forzando transicion a app');
+      setPhase('app');
+    }, 5000);
+    return () => clearTimeout(failsafe);
+  }, [phase]);
 
   if (phase === 'checking') {
     return (
@@ -49,15 +54,11 @@ export default function App() {
   }
 
   if (phase === 'login') {
-    return <LoginScreen onSuccess={() => setPhase('auto-splash')} />;
+    return <LoginScreen onSuccess={() => setPhase('splash')} />;
   }
 
-  if (phase === 'auto-splash') {
-    return <SplashScreen mode="auto" onEnter={() => setPhase('tap-splash')} />;
-  }
-
-  if (phase === 'tap-splash') {
-    return <SplashScreen mode="tap" onEnter={() => setPhase('app')} />;
+  if (phase === 'splash') {
+    return <SplashScreen mode="auto" onEnter={() => setPhase('app')} />;
   }
 
   return (
