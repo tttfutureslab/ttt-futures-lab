@@ -4,7 +4,8 @@ import { logout } from '../lib/api';
 import './AppHeader.css';
 
 const NAV = [
-  { to: '/',            label: '📈 TRADING' },
+  { to: '/',            label: '📊 DASHBOARD' },
+  { to: '/trading',     label: '📈 TRADING' },
   { to: '/gestion',     label: '💼 GESTIÓN' },
   { to: '/backtesting', label: '📊 BACKTEST' },
   { to: '/rules',       label: '📚 NORMAS' }

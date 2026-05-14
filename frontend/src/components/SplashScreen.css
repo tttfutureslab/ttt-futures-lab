@@ -30,17 +30,20 @@
   z-index: 1;
 }
 
+/* Centrado real del contenido */
 .splash-content {
   position: absolute;
-  top: 50%; left: 50%;
+  top: 50%;
+  left: 50%;
   transform: translate(-50%, -50%);
   text-align: center;
   z-index: 10;
   color: #fff;
   width: 90%;
+  max-width: 800px;
 }
 .splash-content h1 {
-  font-size: 5.5vw;
+  font-size: clamp(28px, 5vw, 72px);
   margin: 0;
   letter-spacing: 0.18em;
   font-weight: 800;
@@ -49,8 +52,8 @@
   animation: elegant-pulse 4s ease-in-out infinite;
 }
 .splash-content h2 {
-  font-size: 2vw;
-  margin-top: 1.5vh;
+  font-size: clamp(12px, 1.6vw, 22px);
+  margin-top: 14px;
   font-weight: 300;
   color: #d0d0d0;
   letter-spacing: 0.12em;
@@ -58,8 +61,8 @@
   animation: float-gentle 6s ease-in-out infinite;
 }
 .tap-hint {
-  margin-top: 3vh;
-  font-size: 1.2vw;
+  margin-top: 28px;
+  font-size: clamp(9px, 0.9vw, 12px);
   letter-spacing: 0.4em;
   color: rgba(255,255,255,0.5);
   font-weight: 600;
@@ -79,7 +82,7 @@
   50% { opacity: 0.9; }
 }
 
-/* Tech rings */
+/* Tech rings - centrados absolutos */
 .tech-ring {
   position: absolute;
   border-radius: 50%;
@@ -87,29 +90,20 @@
   pointer-events: none;
   z-index: 0;
   top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
 }
-.ring-wrapper {
-  position: absolute;
-  inset: 0;
-  border-radius: 50%;
-}
-.ring-1 { width: 85vw; height: 85vw; border-style: dashed; }
-.ring-1 .ring-wrapper { animation: spin 180s linear infinite; border-style: dashed; border-width: 2px; border-color: rgba(255,255,255,0.04); }
-.ring-2 { width: 70vw; height: 70vw; }
-.ring-2 .ring-wrapper { animation: spin-reverse 120s linear infinite; border: 1px solid rgba(255,255,255,0.04); border-radius: 50%; }
-.ring-3 { width: 95vw; height: 95vw; border: 2px dotted rgba(255,255,255,0.02); }
+.ring-wrapper { position: absolute; inset: 0; border-radius: 50%; }
+.ring-1 { width: 75vmin; height: 75vmin; border-style: dashed; border-width: 2px; }
+.ring-1 .ring-wrapper { animation: spin 180s linear infinite; }
+.ring-2 { width: 60vmin; height: 60vmin; }
+.ring-2 .ring-wrapper { animation: spin-reverse 120s linear infinite; }
+.ring-3 { width: 85vmin; height: 85vmin; border: 2px dotted rgba(255,255,255,0.02); }
 .ring-3 .ring-wrapper { animation: spin 240s linear infinite; }
 
 @keyframes spin { 100% { transform: rotate(360deg); } }
 @keyframes spin-reverse { 100% { transform: rotate(-360deg); } }
 
-/* Particles */
-.particles {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  z-index: 2;
-}
+.particles { position: absolute; inset: 0; pointer-events: none; z-index: 2; }
 .particle {
   position: absolute;
   background: #fff;
@@ -123,25 +117,25 @@
   100% { transform: translateY(-20vh) translateX(5vw) scale(1); opacity: 0; }
 }
 
-/* Graphics (clock + microscope) */
+/* Reloj y microscopio - escalados con vmin para que no se descuadren */
 .graphic-container {
   position: absolute;
   z-index: 5;
   pointer-events: none;
-  opacity: 0.35;
+  opacity: 0.3;
   filter: drop-shadow(0 5px 15px rgba(0,0,0,0.5));
 }
 .clock-container {
-  top: -12vw;
-  left: -12vw;
-  width: 48vw;
-  height: 48vw;
+  top: -8vmin;
+  left: -8vmin;
+  width: 40vmin;
+  height: 40vmin;
 }
 .microscope-container {
-  bottom: -8vw;
-  right: -8vw;
-  width: 42vw;
-  height: 42vw;
+  bottom: -6vmin;
+  right: -6vmin;
+  width: 36vmin;
+  height: 36vmin;
 }
 
 .gear-slow { animation: spin 60s linear infinite; transform-origin: 250px 250px; transform-box: fill-box; }
@@ -160,29 +154,18 @@
   100% { transform: translateY(0); opacity: 0.1; }
 }
 
-/* ═══════════════════════════════════════════════════════
-   Mobile adjustments — el HTML original se rompe en móvil
-   porque las gráficas usan vw (responsive al ancho) y en
-   pantallas estrechas se solapan con el texto. Reescalado:
-   ═══════════════════════════════════════════════════════ */
+/* Mobile */
 @media (max-width: 768px) {
-  .splash-content h1 { font-size: 28px; letter-spacing: 0.15em; }
-  .splash-content h2 { font-size: 12px; margin-top: 12px; }
-  .tap-hint { font-size: 10px; margin-top: 24px; }
-
   .clock-container {
-    top: -20vw;
-    left: -25vw;
-    width: 75vw;
-    height: 75vw;
-  }
-  .microscope-container {
-    bottom: -15vw;
-    right: -25vw;
+    top: -15vw;
+    left: -20vw;
     width: 70vw;
     height: 70vw;
   }
-  .ring-1 { width: 110vw; height: 110vw; }
-  .ring-2 { width: 90vw; height: 90vw; }
-  .ring-3 { width: 130vw; height: 130vw; }
+  .microscope-container {
+    bottom: -10vw;
+    right: -20vw;
+    width: 65vw;
+    height: 65vw;
+  }
 }

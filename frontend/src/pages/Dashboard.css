@@ -1,0 +1,181 @@
+.dashboard {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.dash-loading, .dash-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 60vh;
+  text-align: center;
+  color: var(--silver-dim);
+}
+.dash-loading p { font-size: 11px; letter-spacing: 0.3em; margin-top: 16px; }
+.dash-empty h2 {
+  font-size: 14px; letter-spacing: 0.25em; color: var(--silver);
+  margin: 0 0 14px 0;
+}
+.dash-empty p { font-size: 13px; max-width: 480px; line-height: 1.6; }
+
+.dash-pulse {
+  width: 40px; height: 40px;
+  border: 2px solid rgba(255,255,255,0.1);
+  border-top-color: var(--silver);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+@keyframes spin { 100% { transform: rotate(360deg); } }
+
+.dash-totals {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+}
+.total-card {
+  background: linear-gradient(180deg, rgba(255,255,255,0.05), rgba(255,255,255,0.01));
+  border: 1px solid var(--silver-line);
+  border-radius: 12px;
+  padding: 14px 18px;
+}
+.total-label {
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  color: var(--silver-dim);
+  text-transform: uppercase;
+}
+.total-value {
+  font-size: 22px;
+  font-weight: 700;
+  margin-top: 6px;
+  color: var(--silver);
+}
+
+.dash-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 14px;
+}
+
+.acc-card {
+  background: linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.01));
+  border: 1px solid var(--silver-line);
+  border-radius: 12px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  transition: border-color 0.3s ease;
+}
+.acc-card.warning { border-color: rgba(247, 198, 107, 0.4); }
+.acc-card.critical { border-color: rgba(247, 107, 107, 0.6); }
+
+.acc-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+.acc-label {
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  color: var(--silver);
+}
+.acc-firm {
+  font-size: 10px;
+  letter-spacing: 0.15em;
+  color: var(--silver-dim);
+  text-transform: uppercase;
+  margin-top: 3px;
+}
+.acc-alert-icon {
+  font-size: 18px;
+  color: var(--accent-amber);
+}
+.acc-card.critical .acc-alert-icon { color: var(--accent-red); }
+
+.acc-metrics {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+.acc-metric-label {
+  font-size: 9px;
+  letter-spacing: 0.15em;
+  color: var(--silver-dim);
+  text-transform: uppercase;
+}
+.acc-metric-value {
+  font-size: 15px;
+  font-weight: 600;
+  margin-top: 3px;
+  color: var(--silver);
+}
+
+.acc-spark {
+  height: 50px;
+  margin-top: 4px;
+}
+.acc-spark svg {
+  width: 100%;
+  height: 100%;
+}
+
+.acc-alerts {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.acc-alert {
+  font-size: 11px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  background: rgba(247, 198, 107, 0.1);
+  border-left: 3px solid var(--accent-amber);
+}
+.acc-alert.critical {
+  background: rgba(247, 107, 107, 0.1);
+  border-left-color: var(--accent-red);
+  color: var(--accent-red);
+}
+
+/* Tabla resumen */
+.dash-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.dash-table thead th {
+  text-align: left;
+  font-size: 10px;
+  letter-spacing: 0.15em;
+  color: var(--silver-dim);
+  text-transform: uppercase;
+  padding: 8px;
+  border-bottom: 1px solid var(--silver-line);
+}
+.dash-table tbody tr {
+  border-bottom: 1px solid var(--silver-line);
+}
+.dash-table tbody tr:hover {
+  background: rgba(255,255,255,0.02);
+}
+.dash-table td {
+  padding: 10px 8px;
+}
+.dash-table .right { text-align: right; }
+.dash-table .dim { color: var(--silver-dim); font-size: 11px; }
+
+.badge {
+  display: inline-block;
+  padding: 3px 8px;
+  border-radius: 4px;
+  font-size: 10px;
+  letter-spacing: 0.05em;
+  margin: 2px 4px 2px 0;
+}
+.badge.ok { background: rgba(108, 217, 126, 0.15); color: var(--accent-green); }
+.badge.warning { background: rgba(247, 198, 107, 0.15); color: var(--accent-amber); }
+.badge.critical { background: rgba(247, 107, 107, 0.15); color: var(--accent-red); }

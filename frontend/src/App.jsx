@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import SplashScreen from './components/SplashScreen';
 import LoginScreen from './components/LoginScreen';
 import AppHeader from './components/AppHeader';
+import Dashboard from './pages/Dashboard';
 import ChatTrading from './pages/ChatTrading';
 import ChatGestion from './pages/ChatGestion';
 import ChatBacktesting from './pages/ChatBacktesting';
@@ -53,7 +54,8 @@ export default function App() {
         <AppHeader onLogout={() => setPhase('login')} />
         <main className="main-content">
           <Routes>
-            <Route path="/"            element={<ChatTrading />} />
+            <Route path="/"            element={<Dashboard />} />
+            <Route path="/trading"     element={<ChatTrading />} />
             <Route path="/gestion"     element={<ChatGestion />} />
             <Route path="/backtesting" element={<ChatBacktesting />} />
             <Route path="/rules"       element={<Rules />} />
