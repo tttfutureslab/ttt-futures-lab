@@ -90,3 +90,16 @@
   }
   .nav-link { padding: 6px 10px; font-size: 10px; }
 }
+
+.logout-btn {
+  background: transparent;
+  border: 1px solid transparent;
+  cursor: pointer;
+  font-family: var(--font-display);
+  font-size: 16px !important;
+  padding: 6px 12px !important;
+}
+.logout-btn:hover {
+  color: var(--accent-red);
+  background: rgba(247, 107, 107, 0.08);
+}

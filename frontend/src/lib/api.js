@@ -2,15 +2,26 @@ const API = '/api';
 
 async function jsonFetch(url, opts = {}) {
   const res = await fetch(url, {
+    credentials: 'include', // ⬅️ Envía la cookie de sesión
     ...opts,
     headers: { 'Content-Type': 'application/json', ...(opts.headers || {}) }
   });
+  if (res.status === 401) {
+    // Sesión expirada o no autenticado → redirige al login
+    window.dispatchEvent(new CustomEvent('auth:unauthorized'));
+    throw new Error('No autenticado');
+  }
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: 'Unknown error' }));
     throw new Error(err.error || `HTTP ${res.status}`);
   }
   return res.json();
 }
+
+// Auth
+export const getAuthStatus = () => jsonFetch(`${API}/auth/status`);
+export const login = (password) => jsonFetch(`${API}/auth/login`, { method: 'POST', body: JSON.stringify({ password }) });
+export const logout = () => jsonFetch(`${API}/auth/logout`, { method: 'POST' });
 
 // Accounts
 export const getAccounts = () => jsonFetch(`${API}/accounts`);
@@ -24,7 +35,11 @@ export async function analyzeScreenshot(file, accountId) {
   const fd = new FormData();
   fd.append('screenshot', file);
   if (accountId) fd.append('account_id', accountId);
-  const res = await fetch(`${API}/vision/analyze`, { method: 'POST', body: fd });
+  const res = await fetch(`${API}/vision/analyze`, { method: 'POST', body: fd, credentials: 'include' });
+  if (res.status === 401) {
+    window.dispatchEvent(new CustomEvent('auth:unauthorized'));
+    throw new Error('No autenticado');
+  }
   if (!res.ok) throw new Error('Vision error');
   return res.json();
 }

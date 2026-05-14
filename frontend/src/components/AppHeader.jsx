@@ -1,5 +1,6 @@
 import { Link, useLocation } from 'react-router-dom';
 import { useEffect, useRef } from 'react';
+import { logout } from '../lib/api';
 import './AppHeader.css';
 
 const NAV = [
@@ -10,7 +11,7 @@ const NAV = [
   { to: '/history', label: 'HISTORIAL' }
 ];
 
-export default function AppHeader() {
+export default function AppHeader({ onLogout }) {
   const location = useLocation();
   const hourRef = useRef(null);
   const minuteRef = useRef(null);
@@ -33,11 +34,20 @@ export default function AppHeader() {
     return () => cancelAnimationFrame(raf);
   }, []);
 
+  async function handleLogout() {
+    if (!confirm('¿Cerrar sesión?')) return;
+    try {
+      await logout();
+    } catch (e) {
+      // continuar igual
+    }
+    onLogout?.();
+  }
+
   return (
     <header className="app-header">
       <div className="header-left">
         <Link to="/" className="header-logo">
-          {/* Mini clock */}
           <svg className="mini-clock" viewBox="0 0 100 100" width="38" height="38" fill="none" stroke="rgba(255,255,255,0.85)" strokeWidth="2">
             <circle cx="50" cy="50" r="46" strokeWidth="1.5" strokeDasharray="3 4" className="gear-slow" style={{ transformOrigin: '50px 50px', transformBox: 'fill-box' }} />
             <circle cx="50" cy="50" r="38" strokeWidth="1" />
@@ -64,6 +74,9 @@ export default function AppHeader() {
             {item.label}
           </Link>
         ))}
+        <button className="nav-link logout-btn" onClick={handleLogout} title="Cerrar sesión">
+          ⎋
+        </button>
       </nav>
     </header>
   );
