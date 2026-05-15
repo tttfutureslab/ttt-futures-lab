@@ -250,6 +250,19 @@ export const TOOLS_GESTION = [
       }
     }
   }
+,
+  {
+    name: 'transfer_account',
+    description: 'Transfiere una cuenta de un trader a otro. MANTIENE todo el historial (trades, snapshots) - solo cambia la propiedad. Tambien actualiza el trader_id de todos los trades asociados.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        account_label: { type: 'string', description: 'Nombre o identificador de la cuenta a transferir' },
+        new_trader_slug: { type: 'string', enum: ['adri', 'juanka'], description: 'Trader que recibe la cuenta' }
+      },
+      required: ['account_label', 'new_trader_slug']
+    }
+  }
 ];
 
 // ═══════════════════════════════════════════════════════════
@@ -316,6 +329,7 @@ export async function executeTool(toolName, input) {
     case 'create_account': return await execCreateAccount(input);
     case 'update_account_status': return await execUpdateStatus(input);
     case 'rename_account': return await execRenameAccount(input);
+    case 'transfer_account': return await execTransferAccount(input);
     case 'add_rule': return await execAddRule(input);
     case 'update_rule': return await execUpdateRule(input);
     case 'delete_rule': return await execDeleteRule(input);
@@ -722,4 +736,43 @@ async function execListTypeRules(input) {
 
   const result = await query(sql, params);
   return { ok: true, count: result.rows.length, rules: result.rows };
+}
+
+
+async function execTransferAccount(input) {
+  // Buscar cuenta
+  const acc = await query(
+    'SELECT a.id, a.account_label, t.slug AS current_trader FROM accounts a LEFT JOIN traders t ON t.id = a.trader_id WHERE a.account_label ILIKE $1 LIMIT 1',
+    ['%' + input.account_label + '%']
+  );
+  if (acc.rows.length === 0) {
+    return { error: 'Cuenta "' + input.account_label + '" no encontrada' };
+  }
+
+  // Buscar nuevo trader
+  const trader = await query('SELECT id, display_name FROM traders WHERE slug = $1', [input.new_trader_slug]);
+  if (trader.rows.length === 0) {
+    return { error: 'Trader "' + input.new_trader_slug + '" no existe' };
+  }
+
+  const oldTrader = acc.rows[0].current_trader;
+  const accountId = acc.rows[0].id;
+  const newTraderId = trader.rows[0].id;
+
+  if (oldTrader === input.new_trader_slug) {
+    return { error: 'La cuenta "' + acc.rows[0].account_label + '" ya pertenece a ' + input.new_trader_slug.toUpperCase() };
+  }
+
+  // Transaccion: actualizar cuenta + todos los trades vinculados
+  await query('UPDATE accounts SET trader_id = $1, updated_at = NOW() WHERE id = $2', [newTraderId, accountId]);
+  const tradesUpdate = await query('UPDATE trades SET trader_id = $1 WHERE account_id = $2 RETURNING id', [newTraderId, accountId]);
+
+  return {
+    ok: true,
+    account: acc.rows[0].account_label,
+    previous_trader: oldTrader || 'sin asignar',
+    new_trader: input.new_trader_slug,
+    trades_updated: tradesUpdate.rows.length,
+    message: 'Cuenta "' + acc.rows[0].account_label + '" transferida de ' + (oldTrader || 'sin asignar').toUpperCase() + ' a ' + input.new_trader_slug.toUpperCase() + '. ' + tradesUpdate.rows.length + ' trades reasignados.'
+  };
 }
