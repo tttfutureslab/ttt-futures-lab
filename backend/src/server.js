@@ -31,6 +31,7 @@ app.use('/api/account-detail', accountDetailRouter);
 app.use('/api/rules', rulesRouter);
 app.use('/api/chat', chatRouter);
 app.use('/api/dashboard', dashboardRouter);
+app.use('/api/dashboard-stats', dashboardStatsRouter);
 app.use('/api/sessions-stats', sessionsStatsRouter);
 app.use('/api/traders', tradersRouter);
 
