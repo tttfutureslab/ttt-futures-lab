@@ -5,26 +5,24 @@ const router = Router();
 
 /**
  * GET /api/dashboard-stats/stats
- * PnL real por trader y periodo, usando snapshots (no trades) como fuente de verdad.
  *
- * Logica:
- * 1. Para cada cuenta, calcular delta entre cada snapshot consecutivo en BD
- * 2. Asignar ese delta a la fecha del snapshot
- * 3. Agregar por trader y periodo (day/week/month/year)
+ * PnL por trader basado en SNAPSHOTS pero excluyendo:
+ * - Snapshots de payouts (los detectamos por la nota)
+ * - El primer snapshot si pone balance < 50% del size (probable inicializacion mala)
  *
- * Asi capturamos TANTO trades registrados como ajustes manuales de balance,
- * sin doble conteo.
+ * Si el primer snapshot tiene balance >= size_usd: delta inicial = balance - size_usd
+ * Si tiene balance < size_usd: lo ignoramos (no se cuenta como perdida)
  */
 router.get('/stats', async (req, res) => {
   try {
-    // Obtener todos los snapshots ordenados por cuenta y fecha
-    // Calcular delta entre snapshots consecutivos por ventana
     const snapshotDeltas = await query(`
       WITH ordered AS (
         SELECT
+          s.id,
           s.account_id,
           s.snapshot_at,
           s.balance,
+          s.notes,
           a.trader_id,
           a.size_usd,
           ROW_NUMBER() OVER (PARTITION BY s.account_id ORDER BY s.snapshot_at) AS rn,
@@ -35,30 +33,42 @@ router.get('/stats', async (req, res) => {
       SELECT
         trader_id,
         snapshot_at,
-        -- Si es el primer snapshot, el delta es (balance - size_usd) - eso captura el profit inicial cargado manualmente
-        -- Si no, delta es la diferencia con el snapshot anterior
+        notes,
+        size_usd,
+        balance,
+        prev_balance,
+        rn,
         CASE
-          WHEN prev_balance IS NULL THEN (balance - size_usd)
+          -- Primer snapshot: solo cuenta si balance >= size_usd (sino es probablemente init malo)
+          WHEN rn = 1 AND balance >= size_usd THEN (balance - size_usd)
+          WHEN rn = 1 AND balance < size_usd THEN 0
+          -- Snapshots posteriores: delta normal
           ELSE (balance - prev_balance)
         END AS delta_pnl
       FROM ordered
       WHERE trader_id IS NOT NULL
     `);
 
-    // Cargar traders
+    // Filtrar snapshots de payouts (delta negativo causado por register_payout)
+    const filteredDeltas = snapshotDeltas.rows.filter((d) => {
+      const note = (d.notes || '').toLowerCase();
+      // Excluir snapshots generados por payouts
+      if (note.includes('payout')) return false;
+      return true;
+    });
+
     const tradersRes = await query('SELECT id, slug, display_name, color FROM traders ORDER BY id');
     const traders = tradersRes.rows;
 
-    // Agregar deltas por trader y periodo en JS (mas flexible que SQL puro aqui)
     const now = new Date();
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     const startOfWeek = new Date(today);
-    startOfWeek.setDate(today.getDate() - ((today.getDay() + 6) % 7)); // lunes
+    startOfWeek.setDate(today.getDate() - ((today.getDay() + 6) % 7));
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
     const startOfYear = new Date(now.getFullYear(), 0, 1);
 
     const stats = traders.map((t) => {
-      const traderDeltas = snapshotDeltas.rows.filter((d) => d.trader_id === t.id);
+      const traderDeltas = filteredDeltas.filter((d) => d.trader_id === t.id);
 
       let pnl_day = 0, pnl_week = 0, pnl_month = 0, pnl_year = 0, pnl_all_time = 0;
       let trades_day = 0, trades_week = 0, trades_month = 0, trades_year = 0;
@@ -90,7 +100,7 @@ router.get('/stats', async (req, res) => {
       };
     });
 
-    // Payouts cobrados por trader
+    // Payouts cobrados
     const payoutStats = await query(`
       SELECT
         t.slug AS trader,
