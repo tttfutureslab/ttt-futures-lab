@@ -1,12 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import './SplashScreen.css';
 
-/**
- * Splash retro-futurista.
- * Props:
- *   mode: 'auto' (3 seg → onEnter) | 'tap' (espera click del usuario)
- *   onEnter: callback al terminar
- */
 export default function SplashScreen({ mode = 'auto', onEnter }) {
   const [exiting, setExiting] = useState(false);
   const hourRef = useRef(null);
@@ -17,7 +11,8 @@ export default function SplashScreen({ mode = 'auto', onEnter }) {
   const mainTextRef = useRef(null);
   const ringsRef = useRef([]);
 
-  // Reloj en tiempo real
+  const isMobile = typeof window !== 'undefined' && window.matchMedia('(max-width: 768px)').matches;
+
   useEffect(() => {
     let raf;
     function tick() {
@@ -35,16 +30,17 @@ export default function SplashScreen({ mode = 'auto', onEnter }) {
     return () => cancelAnimationFrame(raf);
   }, []);
 
-  // Parallax suave
+  // Parallax SOLO en desktop. En móvil/PWA mantenemos todo perfectamente centrado.
   useEffect(() => {
+    if (isMobile) return;
+
     let target = { x: 0, y: 0 };
     let current = { x: 0, y: 0 };
     let raf;
 
     const onMove = (e) => {
-      const touch = e.touches ? e.touches[0] : e;
-      target.x = touch.clientX / window.innerWidth - 0.5;
-      target.y = touch.clientY / window.innerHeight - 0.5;
+      target.x = e.clientX / window.innerWidth - 0.5;
+      target.y = e.clientY / window.innerHeight - 0.5;
     };
 
     function animate() {
@@ -52,7 +48,10 @@ export default function SplashScreen({ mode = 'auto', onEnter }) {
       current.y += (target.y - current.y) * 0.05;
       if (clockRef.current) clockRef.current.style.transform = `translate(${current.x * -25}px, ${current.y * -25}px)`;
       if (microscopeRef.current) microscopeRef.current.style.transform = `translate(${current.x * 35}px, ${current.y * 35}px)`;
-      if (mainTextRef.current) mainTextRef.current.style.transform = `translate(${current.x * 12}px, ${current.y * 12}px)`;
+      if (mainTextRef.current) {
+        // En desktop, aplicar offset SOBRE el centrado base
+        mainTextRef.current.style.transform = `translate(calc(-50% + ${current.x * 12}px), calc(-50% + ${current.y * 12}px))`;
+      }
       ringsRef.current.forEach((ring, i) => {
         if (!ring) return;
         const d = (i + 1) * 15;
@@ -62,15 +61,12 @@ export default function SplashScreen({ mode = 'auto', onEnter }) {
     }
     animate();
     window.addEventListener('mousemove', onMove);
-    window.addEventListener('touchmove', onMove);
     return () => {
       cancelAnimationFrame(raf);
       window.removeEventListener('mousemove', onMove);
-      window.removeEventListener('touchmove', onMove);
     };
-  }, []);
+  }, [isMobile]);
 
-  // Auto-dismiss en modo 'auto'
   useEffect(() => {
     if (mode !== 'auto') return;
     const t = setTimeout(() => {
@@ -80,7 +76,6 @@ export default function SplashScreen({ mode = 'auto', onEnter }) {
     return () => clearTimeout(t);
   }, [mode, onEnter]);
 
-  // Particles
   const particles = Array.from({ length: 50 }).map((_, i) => {
     const size = Math.random() * 3 + 1;
     return (
@@ -110,21 +105,12 @@ export default function SplashScreen({ mode = 'auto', onEnter }) {
       <div className="splash-overlay" />
       <div className="splash-glow" />
 
-      {/* Rings */}
-      <div className="tech-ring ring-1" ref={(el) => (ringsRef.current[0] = el)}>
-        <div className="ring-wrapper" />
-      </div>
-      <div className="tech-ring ring-2" ref={(el) => (ringsRef.current[1] = el)}>
-        <div className="ring-wrapper" />
-      </div>
-      <div className="tech-ring ring-3" ref={(el) => (ringsRef.current[2] = el)}>
-        <div className="ring-wrapper" />
-      </div>
+      <div className="tech-ring ring-1" ref={(el) => (ringsRef.current[0] = el)}><div className="ring-wrapper" /></div>
+      <div className="tech-ring ring-2" ref={(el) => (ringsRef.current[1] = el)}><div className="ring-wrapper" /></div>
+      <div className="tech-ring ring-3" ref={(el) => (ringsRef.current[2] = el)}><div className="ring-wrapper" /></div>
 
-      {/* Particles */}
       <div className="particles">{particles}</div>
 
-      {/* Clock */}
       <div className="graphic-container clock-container" ref={clockRef}>
         <svg viewBox="0 0 500 500" width="100%" height="100%" fill="none" stroke="rgba(255,255,255,0.9)" strokeWidth="2">
           <g className="gear-slow">
@@ -156,14 +142,12 @@ export default function SplashScreen({ mode = 'auto', onEnter }) {
         </svg>
       </div>
 
-      {/* Main text */}
       <div className="splash-content" ref={mainTextRef}>
         <h1>TTT Futures Lab</h1>
         <h2>Engineers of Time Levels Theorem</h2>
         {mode === 'tap' && <p className="tap-hint">— TAP TO ENTER —</p>}
       </div>
 
-      {/* Microscope */}
       <div className="graphic-container microscope-container" ref={microscopeRef}>
         <svg viewBox="0 0 500 500" width="100%" height="100%" fill="none" stroke="rgba(255,255,255,0.9)" strokeWidth="3" strokeLinejoin="round" strokeLinecap="round">
           <circle cx="200" cy="340" r="45" strokeWidth="2" className="gear-slow" strokeDasharray="10 15" stroke="rgba(255,255,255,0.5)" />

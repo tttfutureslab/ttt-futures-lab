@@ -6,6 +6,9 @@
   z-index: 1000;
   perspective: 1000px;
   transition: opacity 0.7s ease;
+  /* Importante en PWA iOS para no recortar con notch */
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: env(safe-area-inset-bottom);
 }
 .splash-exiting { opacity: 0; pointer-events: none; }
 
@@ -24,36 +27,39 @@
   position: absolute;
   top: 50%; left: 50%;
   transform: translate(-50%, -50%);
-  width: 70vw; height: 70vw;
+  width: 70vmin; height: 70vmin;
   background: radial-gradient(circle, rgba(255,255,255,0.03) 0%, transparent 60%);
   pointer-events: none;
   z-index: 1;
 }
 
-/* Centrado real del contenido */
+/* Contenido SIEMPRE centrado matemáticamente */
 .splash-content {
   position: absolute;
   top: 50%;
   left: 50%;
-  transform: translate(-50%, -50%);
+  transform: translate(-50%, -50%) !important;
   text-align: center;
   z-index: 10;
   color: #fff;
-  width: 90%;
+  width: 90vw;
   max-width: 800px;
+  /* Anular cualquier translate del parallax JS en móvil */
 }
 .splash-content h1 {
-  font-size: clamp(28px, 5vw, 72px);
+  font-size: clamp(24px, 7vw, 60px);
   margin: 0;
-  letter-spacing: 0.18em;
+  letter-spacing: 0.15em;
   font-weight: 800;
   text-transform: uppercase;
   text-shadow: 0 10px 30px rgba(0,0,0,0.9), 0 0 15px rgba(255,255,255,0.15);
   animation: elegant-pulse 4s ease-in-out infinite;
+  word-break: keep-all;
+  white-space: nowrap;
 }
 .splash-content h2 {
-  font-size: clamp(12px, 1.6vw, 22px);
-  margin-top: 14px;
+  font-size: clamp(10px, 1.6vw, 18px);
+  margin-top: 12px;
   font-weight: 300;
   color: #d0d0d0;
   letter-spacing: 0.12em;
@@ -82,7 +88,6 @@
   50% { opacity: 0.9; }
 }
 
-/* Tech rings - centrados absolutos */
 .tech-ring {
   position: absolute;
   border-radius: 50%;
@@ -117,7 +122,6 @@
   100% { transform: translateY(-20vh) translateX(5vw) scale(1); opacity: 0; }
 }
 
-/* Reloj y microscopio - escalados con vmin para que no se descuadren */
 .graphic-container {
   position: absolute;
   z-index: 5;
@@ -143,29 +147,43 @@
 .gear-fast-reverse { animation: spin-reverse 20s linear infinite; transform-origin: 250px 250px; transform-box: fill-box; }
 .knob-spin { animation: spin-reverse 10s linear infinite; transform-origin: 340px 240px; transform-box: fill-box; }
 
-.scan-line {
-  animation: scan-smooth 4s ease-in-out infinite;
-  stroke-width: 4;
-  stroke: #fff;
-}
+.scan-line { animation: scan-smooth 4s ease-in-out infinite; stroke-width: 4; stroke: #fff; }
 @keyframes scan-smooth {
   0% { transform: translateY(0); opacity: 0.1; }
   50% { transform: translateY(-60px); opacity: 0.7; }
   100% { transform: translateY(0); opacity: 0.1; }
 }
 
-/* Mobile */
+/* Mobile / PWA */
 @media (max-width: 768px) {
+  .splash-content h1 {
+    font-size: clamp(20px, 8vw, 36px);
+    letter-spacing: 0.12em;
+  }
+  .splash-content h2 {
+    font-size: 10px;
+    letter-spacing: 0.18em;
+  }
   .clock-container {
-    top: -15vw;
-    left: -20vw;
-    width: 70vw;
-    height: 70vw;
+    top: -12vmin;
+    left: -15vmin;
+    width: 55vmin;
+    height: 55vmin;
   }
   .microscope-container {
-    bottom: -10vw;
-    right: -20vw;
-    width: 65vw;
-    height: 65vw;
+    bottom: -10vmin;
+    right: -15vmin;
+    width: 50vmin;
+    height: 50vmin;
+  }
+}
+
+/* Portrait extremo (iPhone PWA) */
+@media (max-width: 480px) {
+  .splash-content {
+    width: 95vw !important;
+  }
+  .splash-content h1 {
+    font-size: clamp(18px, 7vw, 28px);
   }
 }
