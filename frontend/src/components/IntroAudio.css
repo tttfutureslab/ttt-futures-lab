@@ -1,0 +1,37 @@
+.intro-audio-control {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  z-index: 1000;
+  opacity: 0.6;
+  transition: opacity 0.3s ease;
+}
+.intro-audio-control:hover { opacity: 1; }
+
+.audio-btn {
+  background: rgba(10, 10, 10, 0.8);
+  border: 1px solid rgba(255,255,255,0.15);
+  color: var(--silver);
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  cursor: pointer;
+  font-size: 14px;
+  backdrop-filter: blur(10px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+.audio-btn:hover {
+  background: rgba(20, 20, 20, 0.95);
+  border-color: rgba(255,255,255,0.3);
+  transform: scale(1.1);
+}
+.audio-btn-play {
+  animation: pulse-soft 2s ease-in-out infinite;
+}
+@keyframes pulse-soft {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(255,255,255,0.2); }
+  50% { box-shadow: 0 0 0 8px rgba(255,255,255,0); }
+}
