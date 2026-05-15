@@ -1,4 +1,5 @@
 import { useEffect, useState, useRef } from 'react';
+import AccountProgress from './AccountProgress';
 import './AccountDetailDrawer.css';
 
 const API = '/api';
@@ -82,6 +83,9 @@ export default function AccountDetailDrawer({ accountId, onClose, onUpdate }) {
 
         {data && !loading && (
           <div className="drawer-body">
+            {/* Progreso hacia fondeo/payout */}
+            {accountId && <AccountProgress accountId={accountId} compact={false} />}
+
             {/* Cabecera de la cuenta */}
             <div className="drawer-title-block">
               {editing ? (

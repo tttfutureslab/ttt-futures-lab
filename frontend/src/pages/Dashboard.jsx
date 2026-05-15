@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import './Dashboard.css';
 import AccountDetailDrawer from '../components/AccountDetailDrawer';
+import AccountProgress from '../components/AccountProgress';
 import { getCurrentTrader } from '../lib/traderContext';
 
 const API = '/api';
@@ -231,6 +232,8 @@ function AccountCard({ account, evolution, onClick, compact }) {
       )}
 
       {!compact && evolution.length >= 2 && <Sparkline data={evolution} />}
+
+      {!compact && <AccountProgress accountId={account.id} compact={true} />}
 
       {!compact && hasAlerts && (
         <div className="acc-alerts">
