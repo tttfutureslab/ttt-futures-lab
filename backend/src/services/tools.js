@@ -191,6 +191,65 @@ export const TOOLS_GESTION = [
       }
     }
   }
+,
+  {
+    name: 'lookup_account_rules',
+    description: 'Busca las reglas vigentes de un tipo de cuenta especifico (prop firm + tipo + tamaño + fase). USA ESTO antes de analizar limites, hacer payout requests o crear cuentas para tener datos exactos.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        prop_firm_slug: { type: 'string', enum: ['topone', 'tradeify', 'mffu'] },
+        account_type_name: { type: 'string', enum: ['elite_daily','elite_access','elite_static','growth','select','flex','starter','expert'] },
+        size_usd: { type: 'number', description: 'Tamaño en USD: 25000, 50000, 100000, 150000, 200000' },
+        phase: { type: 'string', enum: ['challenge', 'funded'] }
+      },
+      required: ['prop_firm_slug', 'account_type_name', 'size_usd', 'phase']
+    }
+  },
+  {
+    name: 'save_account_type_rules',
+    description: 'Guarda en BD las reglas detalladas de un tipo de cuenta (despues de verificarlas con web_search). Si ya existe esa combinacion, la marca como historica y crea version nueva.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        prop_firm_slug: { type: 'string', enum: ['topone', 'tradeify', 'mffu'] },
+        account_type_name: { type: 'string', enum: ['elite_daily','elite_access','elite_static','growth','select','flex','starter','expert'] },
+        size_usd: { type: 'number' },
+        phase: { type: 'string', enum: ['challenge', 'funded'] },
+        trailing_dd: { type: 'number', description: 'Drawdown maximo (negativo, ej -2000)' },
+        daily_loss: { type: 'number', description: 'Daily loss limit (negativo, ej -1000)' },
+        profit_target: { type: 'number', description: 'Target a pasar (solo challenge)' },
+        min_trading_days: { type: 'integer' },
+        consistency_pct: { type: 'number', description: 'Best day % maximo sobre total' },
+        max_contracts: { type: 'integer' },
+        max_lots_micro: { type: 'integer' },
+        drawdown_type: { type: 'string', description: 'eod_trailing / intraday_trailing / static' },
+        drawdown_lock_at_balance: { type: 'number', description: 'A partir de que balance se lockea' },
+        payout_split_pct: { type: 'number', description: '90 = 90%' },
+        min_payout_amount: { type: 'number' },
+        activation_fee: { type: 'number' },
+        monthly_fee: { type: 'number' },
+        account_cost: { type: 'number' },
+        weekend_trading: { type: 'boolean' },
+        news_trading: { type: 'boolean' },
+        copy_trading: { type: 'boolean' },
+        max_accounts: { type: 'integer' },
+        notes: { type: 'string' },
+        source_url: { type: 'string', description: 'URL oficial de donde obtuviste los datos' }
+      },
+      required: ['prop_firm_slug', 'account_type_name', 'size_usd', 'phase', 'source_url']
+    }
+  },
+  {
+    name: 'list_account_type_rules',
+    description: 'Lista todas las reglas guardadas de tipos de cuenta. Filtros opcionales.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        prop_firm_slug: { type: 'string', enum: ['topone', 'tradeify', 'mffu'] }
+      }
+    }
+  }
 ];
 
 // ═══════════════════════════════════════════════════════════
@@ -261,6 +320,9 @@ export async function executeTool(toolName, input) {
     case 'update_rule': return await execUpdateRule(input);
     case 'delete_rule': return await execDeleteRule(input);
     case 'list_rules': return await execListRules(input);
+        case 'lookup_account_rules': return await execLookupRules(input);
+    case 'save_account_type_rules': return await execSaveTypeRules(input);
+    case 'list_account_type_rules': return await execListTypeRules(input);
     case 'log_backtest_trade': return await execLogBacktestTrade(input);
     case 'update_backtest_trade': return await execUpdateBacktestTrade(input);
     case 'delete_backtest_trade': return await execDeleteBacktestTrade(input);
@@ -568,4 +630,96 @@ async function execDeleteBacktestTrade(input) {
   const result = await query('DELETE FROM backtest_trades WHERE trade_number = $1 RETURNING trade_number', [input.trade_number]);
   if (result.rows.length === 0) return { error: `Trade #${input.trade_number} no encontrado` };
   return { ok: true, message: `Backtest trade #${input.trade_number} eliminado` };
+}
+
+
+async function execLookupRules(input) {
+  const result = await query(`
+    SELECT atr.*, pf.slug AS firm_slug, pf.name AS firm_name
+    FROM account_type_rules atr
+    JOIN prop_firms pf ON pf.id = atr.prop_firm_id
+    WHERE pf.slug = $1
+      AND atr.account_type_name = $2
+      AND atr.size_usd = $3
+      AND atr.phase = $4
+      AND atr.is_current = TRUE
+    LIMIT 1
+  `, [input.prop_firm_slug, input.account_type_name, input.size_usd, input.phase]);
+
+  if (result.rows.length === 0) {
+    return {
+      found: false,
+      message: 'Reglas no encontradas para ' + input.prop_firm_slug + ' ' + input.account_type_name + ' $' + input.size_usd + ' ' + input.phase + '. Usa web_search para buscarlas en la web oficial y despues save_account_type_rules para guardarlas.'
+    };
+  }
+
+  return { found: true, rules: result.rows[0] };
+}
+
+async function execSaveTypeRules(input) {
+  const firm = await query('SELECT id, name FROM prop_firms WHERE slug = $1', [input.prop_firm_slug]);
+  if (firm.rows.length === 0) return { error: 'Prop firm no encontrada' };
+
+  // Marcar las existentes como historicas
+  await query(
+    'UPDATE account_type_rules SET is_current = FALSE WHERE prop_firm_id = $1 AND account_type_name = $2 AND size_usd = $3 AND phase = $4 AND is_current = TRUE',
+    [firm.rows[0].id, input.account_type_name, input.size_usd, input.phase]
+  );
+
+  const result = await query(`
+    INSERT INTO account_type_rules (
+      prop_firm_id, account_type_name, size_usd, phase,
+      trailing_dd, daily_loss, profit_target,
+      min_trading_days, consistency_pct, max_contracts, max_lots_micro,
+      drawdown_type, drawdown_lock_at_balance,
+      payout_split_pct, min_payout_amount,
+      activation_fee, monthly_fee, account_cost,
+      weekend_trading, news_trading, copy_trading, max_accounts,
+      notes, source_url, is_current
+    ) VALUES (
+      $1, $2, $3, $4,
+      $5, $6, $7,
+      $8, $9, $10, $11,
+      $12, $13,
+      $14, $15,
+      $16, $17, $18,
+      $19, $20, $21, $22,
+      $23, $24, TRUE
+    ) RETURNING id, account_type_name, size_usd, phase
+  `, [
+    firm.rows[0].id, input.account_type_name, input.size_usd, input.phase,
+    input.trailing_dd, input.daily_loss, input.profit_target,
+    input.min_trading_days, input.consistency_pct, input.max_contracts, input.max_lots_micro,
+    input.drawdown_type, input.drawdown_lock_at_balance,
+    input.payout_split_pct, input.min_payout_amount,
+    input.activation_fee, input.monthly_fee, input.account_cost,
+    input.weekend_trading, input.news_trading, input.copy_trading, input.max_accounts,
+    input.notes, input.source_url
+  ]);
+
+  return {
+    ok: true,
+    rules: result.rows[0],
+    message: 'Reglas guardadas: ' + firm.rows[0].name + ' ' + input.account_type_name + ' $' + input.size_usd + ' ' + input.phase
+  };
+}
+
+async function execListTypeRules(input) {
+  let sql = `
+    SELECT pf.slug AS firm, atr.account_type_name, atr.size_usd, atr.phase,
+           atr.trailing_dd, atr.daily_loss, atr.profit_target, atr.min_trading_days,
+           atr.consistency_pct, atr.payout_split_pct, atr.account_cost
+    FROM account_type_rules atr
+    JOIN prop_firms pf ON pf.id = atr.prop_firm_id
+    WHERE atr.is_current = TRUE
+  `;
+  const params = [];
+  if (input.prop_firm_slug) {
+    sql += ' AND pf.slug = $1';
+    params.push(input.prop_firm_slug);
+  }
+  sql += ' ORDER BY pf.slug, atr.account_type_name, atr.size_usd, atr.phase';
+
+  const result = await query(sql, params);
+  return { ok: true, count: result.rows.length, rules: result.rows };
 }
