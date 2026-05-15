@@ -5,13 +5,13 @@ const router = Router();
 
 router.get('/', async (req, res) => {
   try {
+    // TODAS las cuentas (sin filtrar por status) - separamos activas/archivadas en frontend
     const accounts = await query(`
       SELECT
-        a.id, a.account_label, a.size_usd, a.status, a.account_type,
+        a.id, a.account_label, a.size_usd, a.status, a.account_type_name, a.phase,
         a.daily_loss AS daily_loss_limit,
         a.trailing_dd AS trailing_dd_limit,
         a.profit_target,
-        a.consistency_pct,
         pf.slug AS firm_slug, pf.name AS firm_name,
         COALESCE(t.slug, 'adri') AS trader_slug,
         COALESCE(t.display_name, 'ADRI') AS trader_name,
@@ -21,7 +21,9 @@ router.get('/', async (req, res) => {
                  best_day_pnl, trading_days, snapshot_at
           FROM snapshots WHERE account_id = a.id
           ORDER BY snapshot_at DESC LIMIT 1
-        ) s) AS last_snapshot
+        ) s) AS last_snapshot,
+        -- Total payouts cobrados de esta cuenta
+        COALESCE((SELECT SUM(amount_usd) FROM payouts WHERE account_id = a.id), 0)::numeric(12,2) AS total_payouts
       FROM accounts a
       JOIN prop_firms pf ON pf.id = a.prop_firm_id
       LEFT JOIN traders t ON t.id = a.trader_id

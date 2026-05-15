@@ -263,6 +263,47 @@ export const TOOLS_GESTION = [
       required: ['account_label', 'new_trader_slug']
     }
   }
+,
+  {
+    name: 'register_payout',
+    description: 'Registra un retiro/payout cobrado de una cuenta funded. DESCUENTA automaticamente el balance de la cuenta (crea snapshot reducido) y lo guarda en la tabla de payouts para tracking historico. Usa esto cuando el usuario diga "hice un payout", "cobre", "retire", "withdrawal" o similar.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        account_label: { type: 'string', description: 'Nombre identificador de la cuenta desde la que se retira' },
+        amount_usd: { type: 'number', description: 'Importe NETO recibido en USD (lo que llega al trader)' },
+        gross_amount: { type: 'number', description: 'Importe BRUTO antes del split (opcional)' },
+        payout_split_pct: { type: 'number', description: 'Porcentaje del split aplicado, ej 90' },
+        payout_date: { type: 'string', description: 'Fecha del payout en formato YYYY-MM-DD (default hoy)' },
+        payment_method: { type: 'string', description: 'bank, wise, crypto, paypal, etc' },
+        notes: { type: 'string' }
+      },
+      required: ['account_label', 'amount_usd']
+    }
+  },
+  {
+    name: 'list_payouts',
+    description: 'Lista los payouts cobrados, opcionalmente filtrados por cuenta o trader.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        account_label: { type: 'string' },
+        trader_slug: { type: 'string', enum: ['adri', 'juanka'] },
+        limit: { type: 'integer', description: 'Maximo de resultados (default 20)' }
+      }
+    }
+  },
+  {
+    name: 'delete_payout',
+    description: 'Borra un payout registrado por error. REVIERTE automaticamente el balance de la cuenta sumando el importe de vuelta.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        payout_id: { type: 'integer' }
+      },
+      required: ['payout_id']
+    }
+  }
 ];
 
 // ═══════════════════════════════════════════════════════════
@@ -337,6 +378,9 @@ export async function executeTool(toolName, input) {
         case 'lookup_account_rules': return await execLookupRules(input);
     case 'save_account_type_rules': return await execSaveTypeRules(input);
     case 'list_account_type_rules': return await execListTypeRules(input);
+    case 'register_payout': return await execRegisterPayout(input);
+    case 'list_payouts': return await execListPayouts(input);
+    case 'delete_payout': return await execDeletePayout(input);
     case 'log_backtest_trade': return await execLogBacktestTrade(input);
     case 'update_backtest_trade': return await execUpdateBacktestTrade(input);
     case 'delete_backtest_trade': return await execDeleteBacktestTrade(input);
@@ -775,4 +819,126 @@ async function execTransferAccount(input) {
     trades_updated: tradesUpdate.rows.length,
     message: 'Cuenta "' + acc.rows[0].account_label + '" transferida de ' + (oldTrader || 'sin asignar').toUpperCase() + ' a ' + input.new_trader_slug.toUpperCase() + '. ' + tradesUpdate.rows.length + ' trades reasignados.'
   };
+}
+
+
+async function execRegisterPayout(input) {
+  // 1. Buscar cuenta
+  const acc = await query(
+    'SELECT a.id, a.account_label, a.trader_id, t.slug AS trader_slug FROM accounts a LEFT JOIN traders t ON t.id = a.trader_id WHERE a.account_label ILIKE $1 LIMIT 1',
+    ['%' + input.account_label + '%']
+  );
+  if (acc.rows.length === 0) {
+    return { error: 'Cuenta "' + input.account_label + '" no encontrada' };
+  }
+  const account = acc.rows[0];
+  const amount = Number(input.amount_usd);
+  if (!amount || amount <= 0) return { error: 'Importe invalido' };
+
+  // 2. Registrar el payout
+  const payoutRes = await query(`
+    INSERT INTO payouts (
+      account_id, trader_id, amount_usd, gross_amount, payout_split_pct,
+      payout_date, payment_method, notes
+    ) VALUES ($1, $2, $3, $4, $5, COALESCE($6::date, CURRENT_DATE), $7, $8)
+    RETURNING id, amount_usd, payout_date
+  `, [
+    account.id,
+    account.trader_id,
+    amount,
+    input.gross_amount,
+    input.payout_split_pct,
+    input.payout_date,
+    input.payment_method,
+    input.notes
+  ]);
+
+  // 3. Descontar del balance creando snapshot nuevo
+  const lastSnap = await query(
+    'SELECT balance, equity, pnl_total, pnl_today, best_day_pnl, trading_days FROM snapshots WHERE account_id = $1 ORDER BY snapshot_at DESC LIMIT 1',
+    [account.id]
+  );
+  const prev = lastSnap.rows[0] || { balance: 0, equity: 0, pnl_total: 0, pnl_today: 0, best_day_pnl: 0, trading_days: 1 };
+  const newBalance = Number(prev.balance || 0) - amount;
+  const newEquity = Number(prev.equity || 0) - amount;
+  // El payout NO afecta pnl_total ni pnl_today (esos son resultado de trading)
+
+  await query(`
+    INSERT INTO snapshots (account_id, balance, equity, pnl_today, pnl_total, best_day_pnl, trading_days, notes)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+  `, [
+    account.id, newBalance, newEquity,
+    prev.pnl_today, prev.pnl_total, prev.best_day_pnl, prev.trading_days,
+    'Payout cobrado: -$' + amount.toFixed(2)
+  ]);
+
+  return {
+    ok: true,
+    payout: payoutRes.rows[0],
+    account: account.account_label,
+    trader: account.trader_slug,
+    new_balance: newBalance,
+    message: 'Payout #' + payoutRes.rows[0].id + ' registrado: $' + amount.toFixed(2) + ' de ' + account.account_label + '. Balance: $' + newBalance.toFixed(2)
+  };
+}
+
+async function execListPayouts(input) {
+  let sql = `
+    SELECT p.id, p.amount_usd, p.gross_amount, p.payout_split_pct, p.payout_date,
+           p.payment_method, p.notes, a.account_label, t.slug AS trader
+    FROM payouts p
+    LEFT JOIN accounts a ON a.id = p.account_id
+    LEFT JOIN traders t ON t.id = p.trader_id
+    WHERE 1=1
+  `;
+  const params = [];
+  if (input.account_label) {
+    params.push('%' + input.account_label + '%');
+    sql += ' AND a.account_label ILIKE $' + params.length;
+  }
+  if (input.trader_slug) {
+    params.push(input.trader_slug);
+    sql += ' AND t.slug = $' + params.length;
+  }
+  sql += ' ORDER BY p.payout_date DESC, p.id DESC LIMIT ' + Math.min(input.limit || 20, 50);
+
+  const result = await query(sql, params);
+  const total = result.rows.reduce((s, r) => s + Number(r.amount_usd || 0), 0);
+  return { ok: true, count: result.rows.length, total_amount: total, payouts: result.rows };
+}
+
+async function execDeletePayout(input) {
+  // Buscar el payout
+  const p = await query(
+    'SELECT account_id, amount_usd FROM payouts WHERE id = $1',
+    [input.payout_id]
+  );
+  if (p.rows.length === 0) return { error: 'Payout #' + input.payout_id + ' no encontrado' };
+
+  const amount = Number(p.rows[0].amount_usd);
+  const accountId = p.rows[0].account_id;
+
+  // Borrar
+  await query('DELETE FROM payouts WHERE id = $1', [input.payout_id]);
+
+  // Revertir balance
+  if (accountId) {
+    const lastSnap = await query(
+      'SELECT balance, equity, pnl_total, pnl_today, best_day_pnl, trading_days FROM snapshots WHERE account_id = $1 ORDER BY snapshot_at DESC LIMIT 1',
+      [accountId]
+    );
+    const prev = lastSnap.rows[0] || { balance: 0, equity: 0, pnl_total: 0, pnl_today: 0, best_day_pnl: 0, trading_days: 1 };
+    await query(`
+      INSERT INTO snapshots (account_id, balance, equity, pnl_today, pnl_total, best_day_pnl, trading_days, notes)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+    `, [
+      accountId,
+      Number(prev.balance || 0) + amount,
+      Number(prev.equity || 0) + amount,
+      prev.pnl_today, prev.pnl_total, prev.best_day_pnl, prev.trading_days,
+      'Payout #' + input.payout_id + ' borrado, devuelto $' + amount.toFixed(2)
+    ]);
+  }
+
+  return { ok: true, message: 'Payout #' + input.payout_id + ' eliminado. $' + amount.toFixed(2) + ' devuelto al balance.' };
 }

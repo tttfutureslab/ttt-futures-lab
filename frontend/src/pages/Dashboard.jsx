@@ -142,6 +142,8 @@ export default function Dashboard() {
 
 function PnlBlock({ stats }) {
   const color = stats.color || TRADER_COLORS[stats.trader] || '#888';
+  const payouts = stats.payouts || { payouts_total: 0, payouts_month: 0, payouts_year: 0, payouts_count: 0 };
+
   const periods = [
     { label: 'HOY',  value: stats.pnl_day,   trades: stats.trades_day },
     { label: 'SEM',  value: stats.pnl_week,  trades: stats.trades_week },
@@ -154,6 +156,11 @@ function PnlBlock({ stats }) {
       <div className="pnl-block-header" style={{ borderColor: color + '30' }}>
         <span className="pnl-trader-dot" style={{ background: color }} />
         <span className="pnl-trader-name" style={{ color }}>{stats.trader_name}</span>
+        {Number(stats.pnl_total_all_time) !== 0 && (
+          <span className="pnl-historic" title="PnL histórico total (todas las cuentas)">
+            HIST {fmt(stats.pnl_total_all_time)}
+          </span>
+        )}
       </div>
       <div className="pnl-block-cards">
         {periods.map((p) => {
@@ -167,6 +174,17 @@ function PnlBlock({ stats }) {
           );
         })}
       </div>
+      {Number(payouts.payouts_total) > 0 && (
+        <div className="pnl-payouts-row" style={{ borderTopColor: color + '30' }}>
+          <span className="pnl-payouts-label">💰 PAYOUTS COBRADOS</span>
+          <span className="pnl-payouts-detail">
+            Mes <b className="value-pos">{fmt(payouts.payouts_month)}</b> ·
+            Año <b className="value-pos">{fmt(payouts.payouts_year)}</b> ·
+            Total <b className="value-pos">{fmt(payouts.payouts_total)}</b>
+            <span className="pnl-payouts-count">({payouts.payouts_count})</span>
+          </span>
+        </div>
+      )}
     </div>
   );
 }
