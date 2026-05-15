@@ -5,33 +5,92 @@ const router = Router();
 
 /**
  * GET /api/dashboard-stats/stats
- * PnL agregado de TODOS los trades (activas, archivadas, passed, blown) por trader y periodo.
- * Tambien incluye payouts cobrados por trader.
+ * PnL real por trader y periodo, usando snapshots (no trades) como fuente de verdad.
+ *
+ * Logica:
+ * 1. Para cada cuenta, calcular delta entre cada snapshot consecutivo en BD
+ * 2. Asignar ese delta a la fecha del snapshot
+ * 3. Agregar por trader y periodo (day/week/month/year)
+ *
+ * Asi capturamos TANTO trades registrados como ajustes manuales de balance,
+ * sin doble conteo.
  */
 router.get('/stats', async (req, res) => {
   try {
-    // PnL trades (todos, sin filtrar por status de cuenta)
-    const tradesStats = await query(`
+    // Obtener todos los snapshots ordenados por cuenta y fecha
+    // Calcular delta entre snapshots consecutivos por ventana
+    const snapshotDeltas = await query(`
+      WITH ordered AS (
+        SELECT
+          s.account_id,
+          s.snapshot_at,
+          s.balance,
+          a.trader_id,
+          a.size_usd,
+          ROW_NUMBER() OVER (PARTITION BY s.account_id ORDER BY s.snapshot_at) AS rn,
+          LAG(s.balance) OVER (PARTITION BY s.account_id ORDER BY s.snapshot_at) AS prev_balance
+        FROM snapshots s
+        JOIN accounts a ON a.id = s.account_id
+      )
       SELECT
-        t.slug AS trader,
-        t.display_name AS trader_name,
-        t.color,
-        COALESCE(SUM(CASE WHEN tr.trade_at::date = CURRENT_DATE THEN tr.pnl_usd ELSE 0 END), 0)::numeric(12,2) AS pnl_day,
-        COALESCE(SUM(CASE WHEN tr.trade_at >= date_trunc('week', CURRENT_DATE) THEN tr.pnl_usd ELSE 0 END), 0)::numeric(12,2) AS pnl_week,
-        COALESCE(SUM(CASE WHEN tr.trade_at >= date_trunc('month', CURRENT_DATE) THEN tr.pnl_usd ELSE 0 END), 0)::numeric(12,2) AS pnl_month,
-        COALESCE(SUM(CASE WHEN tr.trade_at >= date_trunc('year', CURRENT_DATE) THEN tr.pnl_usd ELSE 0 END), 0)::numeric(12,2) AS pnl_year,
-        COALESCE(SUM(tr.pnl_usd), 0)::numeric(12,2) AS pnl_total_all_time,
-        COUNT(tr.id) FILTER (WHERE tr.trade_at::date = CURRENT_DATE) AS trades_day,
-        COUNT(tr.id) FILTER (WHERE tr.trade_at >= date_trunc('week', CURRENT_DATE)) AS trades_week,
-        COUNT(tr.id) FILTER (WHERE tr.trade_at >= date_trunc('month', CURRENT_DATE)) AS trades_month,
-        COUNT(tr.id) FILTER (WHERE tr.trade_at >= date_trunc('year', CURRENT_DATE)) AS trades_year
-      FROM traders t
-      LEFT JOIN trades tr ON tr.trader_id = t.id
-      GROUP BY t.id, t.slug, t.display_name, t.color
-      ORDER BY t.id
+        trader_id,
+        snapshot_at,
+        -- Si es el primer snapshot, el delta es (balance - size_usd) - eso captura el profit inicial cargado manualmente
+        -- Si no, delta es la diferencia con el snapshot anterior
+        CASE
+          WHEN prev_balance IS NULL THEN (balance - size_usd)
+          ELSE (balance - prev_balance)
+        END AS delta_pnl
+      FROM ordered
+      WHERE trader_id IS NOT NULL
     `);
 
-    // Payouts cobrados por trader (total + por periodo)
+    // Cargar traders
+    const tradersRes = await query('SELECT id, slug, display_name, color FROM traders ORDER BY id');
+    const traders = tradersRes.rows;
+
+    // Agregar deltas por trader y periodo en JS (mas flexible que SQL puro aqui)
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const startOfWeek = new Date(today);
+    startOfWeek.setDate(today.getDate() - ((today.getDay() + 6) % 7)); // lunes
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const startOfYear = new Date(now.getFullYear(), 0, 1);
+
+    const stats = traders.map((t) => {
+      const traderDeltas = snapshotDeltas.rows.filter((d) => d.trader_id === t.id);
+
+      let pnl_day = 0, pnl_week = 0, pnl_month = 0, pnl_year = 0, pnl_all_time = 0;
+      let trades_day = 0, trades_week = 0, trades_month = 0, trades_year = 0;
+
+      for (const d of traderDeltas) {
+        const delta = Number(d.delta_pnl || 0);
+        if (delta === 0) continue;
+        const snapDate = new Date(d.snapshot_at);
+        pnl_all_time += delta;
+        if (snapDate >= startOfYear) { pnl_year += delta; trades_year++; }
+        if (snapDate >= startOfMonth) { pnl_month += delta; trades_month++; }
+        if (snapDate >= startOfWeek) { pnl_week += delta; trades_week++; }
+        if (snapDate >= today) { pnl_day += delta; trades_day++; }
+      }
+
+      return {
+        trader: t.slug,
+        trader_name: t.display_name,
+        color: t.color,
+        pnl_day: pnl_day.toFixed(2),
+        pnl_week: pnl_week.toFixed(2),
+        pnl_month: pnl_month.toFixed(2),
+        pnl_year: pnl_year.toFixed(2),
+        pnl_total_all_time: pnl_all_time.toFixed(2),
+        trades_day,
+        trades_week,
+        trades_month,
+        trades_year
+      };
+    });
+
+    // Payouts cobrados por trader
     const payoutStats = await query(`
       SELECT
         t.slug AS trader,
@@ -47,25 +106,21 @@ router.get('/stats', async (req, res) => {
       ORDER BY t.id
     `);
 
-    // Combinar: por cada trader, mergear trade stats + payout stats
     const payoutMap = {};
     for (const p of payoutStats.rows) payoutMap[p.trader] = p;
 
-    const merged = tradesStats.rows.map((s) => ({
+    const merged = stats.map((s) => ({
       ...s,
       payouts: payoutMap[s.trader] || { payouts_total: 0, payouts_day: 0, payouts_week: 0, payouts_month: 0, payouts_year: 0, payouts_count: 0 }
     }));
 
     res.json({ stats: merged });
   } catch (err) {
+    console.error('stats error:', err);
     res.status(500).json({ error: err.message });
   }
 });
 
-/**
- * GET /api/dashboard-stats/payouts
- * Lista de payouts recientes (todos los traders)
- */
 router.get('/payouts', async (req, res) => {
   try {
     const result = await query(`
