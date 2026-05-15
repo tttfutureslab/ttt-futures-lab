@@ -2,14 +2,14 @@
   position: fixed;
   bottom: 20px;
   right: 20px;
-  z-index: 1000;
+  z-index: 500;
   opacity: 0.6;
   transition: opacity 0.3s ease;
 }
 .intro-audio-control:hover { opacity: 1; }
 
 .audio-btn {
-  background: rgba(10, 10, 10, 0.8);
+  background: rgba(10, 10, 10, 0.85);
   border: 1px solid rgba(255,255,255,0.15);
   color: var(--silver);
   width: 38px;
@@ -29,9 +29,9 @@
   transform: scale(1.1);
 }
 .audio-btn-play {
-  animation: pulse-soft 2s ease-in-out infinite;
+  animation: audio-pulse 2s ease-in-out infinite;
 }
-@keyframes pulse-soft {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(255,255,255,0.2); }
+@keyframes audio-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(255,255,255,0.25); }
   50% { box-shadow: 0 0 0 8px rgba(255,255,255,0); }
 }

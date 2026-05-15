@@ -1,17 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
 import './IntroAudio.css';
 
-const AUDIO_KEY = 'ttt_audio_played';
+const AUDIO_KEY = 'ttt_intro_played';
 
-/**
- * Reproduce un audio una sola vez al abrir la app.
- * Muestra un control para mute/unmute en la esquina.
- */
 export default function IntroAudio() {
   const audioRef = useRef(null);
   const [playing, setPlaying] = useState(false);
   const [muted, setMuted] = useState(false);
   const [shown, setShown] = useState(false);
+  const [hasFile, setHasFile] = useState(true);
 
   useEffect(() => {
     const alreadyPlayed = sessionStorage.getItem(AUDIO_KEY);
@@ -19,10 +16,8 @@ export default function IntroAudio() {
 
     const audio = audioRef.current;
     if (!audio) return;
-
     audio.volume = 0.35;
 
-    // Intentar reproducir tras 800ms (espera a que pase el splash)
     const playTimer = setTimeout(() => {
       audio.play()
         .then(() => {
@@ -30,25 +25,11 @@ export default function IntroAudio() {
           setShown(true);
           sessionStorage.setItem(AUDIO_KEY, '1');
         })
-        .catch(() => {
-          // Autoplay bloqueado por el navegador. Mostrar boton.
-          setShown(true);
-        });
-    }, 800);
+        .catch(() => setShown(true));
+    }, 1500);
 
     return () => clearTimeout(playTimer);
   }, []);
-
-  function toggle() {
-    const audio = audioRef.current;
-    if (!audio) return;
-    if (playing) {
-      audio.pause();
-      setPlaying(false);
-    } else {
-      audio.play().then(() => setPlaying(true));
-    }
-  }
 
   function toggleMute() {
     const audio = audioRef.current;
@@ -57,22 +38,31 @@ export default function IntroAudio() {
     setMuted(!muted);
   }
 
+  function play() {
+    const audio = audioRef.current;
+    if (!audio) return;
+    audio.play().then(() => setPlaying(true)).catch(() => {});
+  }
+
+  if (!hasFile) return null;
+
   return (
     <>
       <audio
         ref={audioRef}
         src="/intro-audio.mp3"
         preload="auto"
+        onError={() => setHasFile(false)}
         onEnded={() => setPlaying(false)}
       />
       {shown && (
-        <div className="intro-audio-control" title={playing ? 'Pausar audio' : 'Reproducir audio'}>
+        <div className="intro-audio-control">
           {playing ? (
-            <button onClick={toggleMute} className="audio-btn">
+            <button onClick={toggleMute} className="audio-btn" title={muted ? 'Quitar mute' : 'Silenciar'}>
               {muted ? '🔇' : '🔊'}
             </button>
           ) : (
-            <button onClick={toggle} className="audio-btn audio-btn-play">▶</button>
+            <button onClick={play} className="audio-btn audio-btn-play" title="Reproducir">▶</button>
           )}
         </div>
       )}

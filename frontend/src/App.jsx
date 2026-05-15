@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
-import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom';
+import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import SplashScreen from './components/SplashScreen';
 import LoginScreen from './components/LoginScreen';
 import AppHeader from './components/AppHeader';
-import PageTransition from './components/PageTransition';
+import PageBurjWrapper from './components/PageBurjWrapper';
 import IntroAudio from './components/IntroAudio';
+import BurjLoader from './components/BurjLoader';
 import Dashboard from './pages/Dashboard';
 import ChatTrading from './pages/ChatTrading';
 import ChatGestion from './pages/ChatGestion';
@@ -18,7 +19,7 @@ function AppContent({ onLogout }) {
     <>
       <AppHeader onLogout={onLogout} />
       <main className="main-content">
-        <PageTransition>
+        <PageBurjWrapper>
           <Routes>
             <Route path="/"            element={<Dashboard />} />
             <Route path="/trading"     element={<ChatTrading />} />
@@ -27,7 +28,7 @@ function AppContent({ onLogout }) {
             <Route path="/sessions"    element={<Sessions />} />
             <Route path="/rules"       element={<Rules />} />
           </Routes>
-        </PageTransition>
+        </PageBurjWrapper>
       </main>
     </>
   );
@@ -35,6 +36,7 @@ function AppContent({ onLogout }) {
 
 export default function App() {
   const [phase, setPhase] = useState('checking');
+  const [showOpeningBurj, setShowOpeningBurj] = useState(true);
 
   useEffect(() => {
     getAuthStatus()
@@ -73,6 +75,9 @@ export default function App() {
       <div className="blueprint-grid" />
       <div className="app-shell">
         <IntroAudio />
+        {showOpeningBurj && (
+          <BurjLoader size="large" duration={2400} onDone={() => setShowOpeningBurj(false)} />
+        )}
         <AppContent onLogout={() => setPhase('login')} />
       </div>
     </BrowserRouter>
