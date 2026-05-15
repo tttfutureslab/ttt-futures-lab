@@ -1,6 +1,7 @@
 import { Link, useLocation } from 'react-router-dom';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { logout } from '../lib/api';
+import { getCurrentTrader } from '../lib/traderContext';
 import './AppHeader.css';
 
 const NAV = [
@@ -12,11 +13,20 @@ const NAV = [
   { to: '/rules',       label: '📚 NORMAS' }
 ];
 
-export default function AppHeader({ onLogout }) {
+const TRADER_COLORS = { adri: '#6cd97e', juanka: '#a3c8ff' };
+
+export default function AppHeader({ onLogout, onSwitchTrader }) {
   const location = useLocation();
   const hourRef = useRef(null);
   const minuteRef = useRef(null);
   const secondRef = useRef(null);
+  const [trader, setTrader] = useState(getCurrentTrader());
+
+  useEffect(() => {
+    const onTraderChange = (e) => setTrader(e.detail?.slug || null);
+    window.addEventListener('trader:changed', onTraderChange);
+    return () => window.removeEventListener('trader:changed', onTraderChange);
+  }, []);
 
   useEffect(() => {
     let raf;
@@ -41,6 +51,8 @@ export default function AppHeader({ onLogout }) {
     onLogout?.();
   }
 
+  const traderColor = TRADER_COLORS[trader] || '#888';
+
   return (
     <header className="app-header">
       <div className="header-left">
@@ -59,6 +71,13 @@ export default function AppHeader({ onLogout }) {
           <span className="title-main">TTT FUTURES LAB</span>
           <span className="title-sub">Engineers of Time Levels Theorem</span>
         </div>
+        {trader && (
+          <button className="trader-badge" onClick={onSwitchTrader} title="Cambiar trader" style={{ borderColor: traderColor }}>
+            <span className="trader-dot" style={{ background: traderColor }} />
+            <span style={{ color: traderColor }}>{trader.toUpperCase()}</span>
+            <span className="trader-swap">⇄</span>
+          </button>
+        )}
       </div>
       <nav className="header-nav">
         {NAV.map((item) => (

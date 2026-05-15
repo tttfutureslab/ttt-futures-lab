@@ -3,10 +3,11 @@ export default function ChatBacktesting() {
   return (
     <ChatPanel
       kind="backtesting"
+      useTrader={false}
       title="📊 CHAT BACKTESTING v18"
-      subtitle="35 trades registrados · +$9,865 · WR 53.3%"
+      subtitle="Compartido · 35 trades · +$9,865 · WR 53.3%"
       color="#f7c66b"
-      placeholder="Dicta un trade nuevo ('#36 London Q4 TP') o pregunta estadísticas del backtest."
+      placeholder="Dicta un trade nuevo o pregunta estadísticas del backtest."
     />
   );
 }

@@ -1,33 +1,40 @@
 import { useEffect, useState } from 'react';
 import './Dashboard.css';
 import AccountDetailDrawer from '../components/AccountDetailDrawer';
+import { getCurrentTrader } from '../lib/traderContext';
 
 const API = '/api';
 
-const fmt = (n, opts = {}) => {
-  if (n === null || n === undefined || isNaN(n)) return '—';
-  return Number(n).toLocaleString('en-US', {
-    style: 'currency', currency: 'USD',
-    minimumFractionDigits: 0, maximumFractionDigits: 0, ...opts
-  });
-};
+const fmt = (n) => (n === null || n === undefined || isNaN(n)) ? '—'
+  : Number(n).toLocaleString('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0, maximumFractionDigits: 0 });
+
+const TRADER_COLORS = { adri: '#6cd97e', juanka: '#a3c8ff' };
 
 export default function Dashboard() {
   const [data, setData] = useState({ accounts: [], evolution: {} });
+  const [stats, setStats] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedAccount, setSelectedAccount] = useState(null);
+  const [viewMode, setViewMode] = useState('all');
+  const [showArchived, setShowArchived] = useState(false);
 
   async function load() {
     setLoading(true);
     try {
-      const res = await fetch(`${API}/dashboard`, { credentials: 'include' });
-      const json = await res.json();
-      setData(json);
+      const [dashRes, statsRes] = await Promise.all([
+        fetch(`${API}/dashboard`, { credentials: 'include' }),
+        fetch(`${API}/dashboard-stats/stats`, { credentials: 'include' })
+      ]);
+      setData(await dashRes.json());
+      const statsData = await statsRes.json();
+      setStats(statsData.stats || []);
     } catch (e) { console.error(e); }
     setLoading(false);
   }
 
   useEffect(() => {
+    const current = getCurrentTrader();
+    if (current) setViewMode(current);
     load();
     const interval = setInterval(load, 30000);
     return () => clearInterval(interval);
@@ -42,105 +49,86 @@ export default function Dashboard() {
     );
   }
 
+  // Filtros y agrupacion
+  const filtered = data.accounts.filter((a) => viewMode === 'all' ? true : a.trader_slug === viewMode);
+  const isArchived = (a) => ['archived', 'blown', 'passed'].includes(a.status);
+  const activeAccounts = filtered.filter((a) => !isArchived(a));
+  const archivedAccounts = filtered.filter(isArchived);
+  const adriActive = activeAccounts.filter((a) => a.trader_slug === 'adri');
+  const juankaActive = activeAccounts.filter((a) => a.trader_slug === 'juanka');
+  const adriArchived = archivedAccounts.filter((a) => a.trader_slug === 'adri');
+  const juankaArchived = archivedAccounts.filter((a) => a.trader_slug === 'juanka');
+
+  // Stats por trader (filtrar segun viewMode)
+  const visibleStats = viewMode === 'all'
+    ? stats
+    : stats.filter((s) => s.trader === viewMode);
+
   if (data.accounts.length === 0) {
     return (
       <div className="dash-empty">
         <h2>NO HAY CUENTAS REGISTRADAS</h2>
-        <p>Ve al <b>CHAT GESTIÓN</b> y pega una captura del dashboard de tu prop firm.</p>
-        <p>Claude leerá los datos y creará la cuenta automáticamente.</p>
+        <p>Ve al <b>CHAT GESTIÓN</b> y pídele a Claude que cree tu primera cuenta.</p>
       </div>
     );
   }
 
-  const totals = data.accounts.reduce((acc, a) => {
-    const last = a.last_snapshot;
-    if (last) {
-      acc.balance += Number(last.balance || 0);
-      acc.pnl_today += Number(last.pnl_today || 0);
-      acc.pnl_total += Number(last.pnl_total || 0);
-    }
-    return acc;
-  }, { balance: 0, pnl_today: 0, pnl_total: 0 });
-
   return (
     <div className="dashboard">
-      <div className="dash-totals">
-        <div className="total-card">
-          <div className="total-label">BALANCE TOTAL</div>
-          <div className="total-value mono-num">{fmt(totals.balance)}</div>
-        </div>
-        <div className="total-card">
-          <div className="total-label">PNL HOY</div>
-          <div className={`total-value mono-num ${totals.pnl_today >= 0 ? 'value-pos' : 'value-neg'}`}>{fmt(totals.pnl_today)}</div>
-        </div>
-        <div className="total-card">
-          <div className="total-label">PNL ACUMULADO</div>
-          <div className={`total-value mono-num ${totals.pnl_total >= 0 ? 'value-pos' : 'value-neg'}`}>{fmt(totals.pnl_total)}</div>
-        </div>
-        <div className="total-card">
-          <div className="total-label">CUENTAS ACTIVAS</div>
-          <div className="total-value mono-num">{data.accounts.length}</div>
-        </div>
+      {/* Tabs trader filter */}
+      <div className="trader-tabs">
+        <button className={`trader-tab ${viewMode === 'all' ? 'active' : ''}`} onClick={() => setViewMode('all')}>TODO</button>
+        <button className={`trader-tab adri ${viewMode === 'adri' ? 'active' : ''}`} onClick={() => setViewMode('adri')}>ADRI</button>
+        <button className={`trader-tab juanka ${viewMode === 'juanka' ? 'active' : ''}`} onClick={() => setViewMode('juanka')}>JUANKA</button>
       </div>
 
-      <div className="dash-grid">
-        {data.accounts.map((acc) => (
-          <AccountCard
-            key={acc.id}
-            account={acc}
-            evolution={data.evolution[acc.id] || []}
-            onClick={() => setSelectedAccount(acc.id)}
-          />
+      {/* Cards PnL por periodo y trader */}
+      <div className="pnl-grid">
+        {visibleStats.map((s) => (
+          <PnlBlock key={s.trader} stats={s} />
         ))}
       </div>
 
-      <div className="panel" style={{ marginTop: 24 }}>
-        <h3 className="panel-title">📋 RESUMEN DE CUENTAS</h3>
-        <p style={{ fontSize: 11, color: 'var(--silver-dim)', marginTop: -8, marginBottom: 12 }}>
-          Click en una fila para ver detalles completos
-        </p>
-        <div style={{ overflowX: 'auto' }}>
-          <table className="dash-table">
-            <thead>
-              <tr>
-                <th>Cuenta</th>
-                <th>Firm</th>
-                <th style={{ textAlign: 'right' }}>Balance</th>
-                <th style={{ textAlign: 'right' }}>PnL hoy</th>
-                <th style={{ textAlign: 'right' }}>PnL total</th>
-                <th style={{ textAlign: 'right' }}>DD actual</th>
-                <th style={{ textAlign: 'right' }}>Días</th>
-                <th>Alertas</th>
-              </tr>
-            </thead>
-            <tbody>
-              {data.accounts.map((acc) => {
-                const last = acc.last_snapshot;
-                return (
-                  <tr key={acc.id} onClick={() => setSelectedAccount(acc.id)} style={{ cursor: 'pointer' }}>
-                    <td><b>{acc.account_label}</b></td>
-                    <td className="dim">{acc.firm_slug}</td>
-                    <td className="mono-num right">{fmt(last?.balance)}</td>
-                    <td className={`mono-num right ${last?.pnl_today >= 0 ? 'value-pos' : 'value-neg'}`}>{fmt(last?.pnl_today)}</td>
-                    <td className={`mono-num right ${last?.pnl_total >= 0 ? 'value-pos' : 'value-neg'}`}>{fmt(last?.pnl_total)}</td>
-                    <td className="mono-num right">{fmt(last?.trailing_dd_now)}</td>
-                    <td className="mono-num right">{last?.trading_days ?? '—'}</td>
-                    <td>
-                      {acc.alerts.length === 0 ? (
-                        <span className="badge ok">✓ OK</span>
-                      ) : (
-                        acc.alerts.map((a, i) => (
-                          <span key={i} className={`badge ${a.level}`}>{a.msg}</span>
-                        ))
-                      )}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+      {/* 2 columnas trader o grid simple */}
+      {viewMode === 'all' ? (
+        <div className="dash-two-cols">
+          <TraderColumn name="ADRI" color="#6cd97e" accounts={adriActive} evolution={data.evolution} onClick={setSelectedAccount} />
+          <TraderColumn name="JUANKA" color="#a3c8ff" accounts={juankaActive} evolution={data.evolution} onClick={setSelectedAccount} />
         </div>
-      </div>
+      ) : (
+        <div className="dash-grid">
+          {activeAccounts.map((acc) => (
+            <AccountCard key={acc.id} account={acc} evolution={data.evolution[acc.id] || []} onClick={() => setSelectedAccount(acc.id)} />
+          ))}
+        </div>
+      )}
+
+      {/* Archivadas */}
+      {archivedAccounts.length > 0 && (
+        <div className="archived-section">
+          <button className="archived-toggle" onClick={() => setShowArchived(!showArchived)}>
+            <span>{showArchived ? '▼' : '▶'}</span>
+            <span>ARCHIVADAS ({archivedAccounts.length})</span>
+            <span className="archived-hint">click para {showArchived ? 'ocultar' : 'mostrar'}</span>
+          </button>
+          {showArchived && (
+            <div className="archived-content">
+              {viewMode === 'all' ? (
+                <div className="dash-two-cols">
+                  <TraderColumn name="ADRI" color="#6cd97e" accounts={adriArchived} evolution={data.evolution} onClick={setSelectedAccount} compact />
+                  <TraderColumn name="JUANKA" color="#a3c8ff" accounts={juankaArchived} evolution={data.evolution} onClick={setSelectedAccount} compact />
+                </div>
+              ) : (
+                <div className="dash-grid">
+                  {archivedAccounts.map((acc) => (
+                    <AccountCard key={acc.id} account={acc} evolution={data.evolution[acc.id] || []} onClick={() => setSelectedAccount(acc.id)} compact />
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
 
       <AccountDetailDrawer
         accountId={selectedAccount}
@@ -151,41 +139,106 @@ export default function Dashboard() {
   );
 }
 
-function AccountCard({ account, evolution, onClick }) {
-  const last = account.last_snapshot;
-  const hasAlerts = account.alerts.length > 0;
-  const criticalAlert = account.alerts.some((a) => a.level === 'critical');
+function PnlBlock({ stats }) {
+  const color = stats.color || TRADER_COLORS[stats.trader] || '#888';
+  const periods = [
+    { label: 'HOY',  value: stats.pnl_day,   trades: stats.trades_day },
+    { label: 'SEM',  value: stats.pnl_week,  trades: stats.trades_week },
+    { label: 'MES',  value: stats.pnl_month, trades: stats.trades_month },
+    { label: 'AÑO',  value: stats.pnl_year,  trades: stats.trades_year }
+  ];
+
   return (
-    <div className={`acc-card ${criticalAlert ? 'critical' : hasAlerts ? 'warning' : ''}`} onClick={onClick} style={{ cursor: 'pointer' }}>
+    <div className="pnl-block" style={{ borderColor: color + '40' }}>
+      <div className="pnl-block-header" style={{ borderColor: color + '30' }}>
+        <span className="pnl-trader-dot" style={{ background: color }} />
+        <span className="pnl-trader-name" style={{ color }}>{stats.trader_name}</span>
+      </div>
+      <div className="pnl-block-cards">
+        {periods.map((p) => {
+          const v = Number(p.value);
+          return (
+            <div key={p.label} className="pnl-mini-card">
+              <div className="pnl-mini-label">{p.label}</div>
+              <div className={`pnl-mini-value mono-num ${v > 0 ? 'value-pos' : v < 0 ? 'value-neg' : ''}`}>{fmt(p.value)}</div>
+              <div className="pnl-mini-trades">{p.trades || 0}t</div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function TraderColumn({ name, color, accounts, evolution, onClick, compact }) {
+  return (
+    <div className="trader-column">
+      <div className="trader-column-head" style={{ borderColor: color + '40' }}>
+        <span className="trader-column-dot" style={{ background: color }} />
+        <span className="trader-column-name" style={{ color }}>{name}</span>
+        <span className="trader-column-count">({accounts.length})</span>
+      </div>
+      {accounts.length === 0 ? (
+        <div className="trader-column-empty">Sin cuentas</div>
+      ) : (
+        <div className="trader-column-cards">
+          {accounts.map((acc) => (
+            <AccountCard key={acc.id} account={acc} evolution={evolution[acc.id] || []} onClick={() => onClick(acc.id)} compact={compact} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function AccountCard({ account, evolution, onClick, compact }) {
+  const last = account.last_snapshot;
+  const hasAlerts = account.alerts && account.alerts.length > 0;
+  const criticalAlert = hasAlerts && account.alerts.some((a) => a.level === 'critical');
+  const statusLabel = account.status?.toUpperCase();
+  const isArchivedStatus = ['archived', 'blown', 'passed'].includes(account.status);
+
+  return (
+    <div className={`acc-card ${criticalAlert ? 'critical' : hasAlerts ? 'warning' : ''} ${compact ? 'compact' : ''} ${isArchivedStatus ? 'status-' + account.status : ''}`} onClick={onClick} style={{ cursor: 'pointer' }}>
       <div className="acc-head">
         <div>
           <div className="acc-label">{account.account_label}</div>
-          <div className="acc-firm">{account.firm_name} · {fmt(account.size_usd)}</div>
+          <div className="acc-firm">
+            {account.firm_name} · {fmt(account.size_usd)}
+            {account.account_type_name && <span className="acc-type"> · {account.account_type_name}</span>}
+            {account.phase && <span className="acc-phase"> · {account.phase}</span>}
+          </div>
         </div>
-        {hasAlerts && (
-          <div className="acc-alert-icon">{criticalAlert ? '⚠' : '⚡'}</div>
-        )}
+        <div className="acc-head-right">
+          {isArchivedStatus && <span className={`status-pill status-${account.status}`}>{statusLabel}</span>}
+          {hasAlerts && <div className="acc-alert-icon">{criticalAlert ? '⚠' : '⚡'}</div>}
+        </div>
       </div>
 
-      <div className="acc-metrics">
-        <Metric label="Balance" value={fmt(last?.balance)} />
-        <Metric label="PnL hoy" value={fmt(last?.pnl_today)} className={last?.pnl_today >= 0 ? 'value-pos' : 'value-neg'} />
-        <Metric label="DD actual" value={fmt(last?.trailing_dd_now)} />
-      </div>
+      {!compact && (
+        <div className="acc-metrics">
+          <Metric label="Balance" value={fmt(last?.balance)} />
+          <Metric label="PnL hoy" value={fmt(last?.pnl_today)} className={last?.pnl_today >= 0 ? 'value-pos' : 'value-neg'} />
+          <Metric label="DD actual" value={fmt(last?.trailing_dd_now)} />
+        </div>
+      )}
 
-      {evolution.length >= 2 && <Sparkline data={evolution} />}
+      {compact && (
+        <div className="acc-metrics-compact">
+          <span className="mono-num">{fmt(last?.balance)}</span>
+          <span className={`mono-num ${last?.pnl_total >= 0 ? 'value-pos' : 'value-neg'}`}>{fmt(last?.pnl_total)}</span>
+        </div>
+      )}
 
-      {account.alerts.length > 0 && (
+      {!compact && evolution.length >= 2 && <Sparkline data={evolution} />}
+
+      {!compact && hasAlerts && (
         <div className="acc-alerts">
           {account.alerts.map((a, i) => (
             <div key={i} className={`acc-alert ${a.level}`}>{a.msg}</div>
           ))}
         </div>
       )}
-
-      <div style={{ fontSize: 10, color: 'var(--silver-dim)', textAlign: 'center', marginTop: 4, letterSpacing: '0.15em' }}>
-        CLICK PARA DETALLES →
-      </div>
     </div>
   );
 }
@@ -205,9 +258,7 @@ function Sparkline({ data }) {
   const max = Math.max(...values);
   const range = max - min || 1;
   const points = values.map((v, i) => `${(i / (values.length - 1)) * 100},${100 - ((v - min) / range) * 100}`).join(' ');
-  const lastVal = values[values.length - 1];
-  const firstVal = values[0];
-  const trending = lastVal >= firstVal ? 'pos' : 'neg';
+  const trending = values[values.length - 1] >= values[0] ? 'pos' : 'neg';
   return (
     <div className="acc-spark">
       <svg viewBox="0 0 100 100" preserveAspectRatio="none">

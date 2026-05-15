@@ -58,3 +58,5 @@ export const getSessions = () => jsonFetch(`${API}/chat/sessions`);
 // Snapshots
 export const getAccountHistory = (id) => jsonFetch(`${API}/snapshots/account/${id}`);
 export const getLatestSnapshots = () => jsonFetch(`${API}/snapshots/latest`);
+
+export const getTraders = () => jsonFetch('${API}/traders');

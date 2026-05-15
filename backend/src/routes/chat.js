@@ -25,17 +25,8 @@ const THINKING_CONFIG = {
   backtesting: { enabled: false, budget: 0 }
 };
 
-const HISTORY_LIMIT = {
-  trading: 25,
-  gestion: 25,
-  backtesting: 8
-};
-
-const MAX_TOKENS = {
-  trading: 6000,
-  gestion: 4500,
-  backtesting: 1500
-};
+const HISTORY_LIMIT = { trading: 25, gestion: 25, backtesting: 8 };
+const MAX_TOKENS = { trading: 6000, gestion: 4500, backtesting: 1500 };
 
 async function callClaudeWithRetry(params, maxRetries = 3) {
   for (let attempt = 0; attempt < maxRetries; attempt++) {
@@ -50,7 +41,7 @@ async function callClaudeWithRetry(params, maxRetries = 3) {
       if (isRateLimit) {
         const retryAfter = parseInt(err.headers?.['retry-after']) || 30;
         if (isLastAttempt) {
-          err.userMessage = `Rate limit. Espera ${retryAfter}s.`;
+          err.userMessage = 'Rate limit. Espera ' + retryAfter + 's.';
           throw err;
         }
         console.log('[Claude] 429 retry-after ' + retryAfter + 's');
@@ -59,38 +50,59 @@ async function callClaudeWithRetry(params, maxRetries = 3) {
       }
 
       if (isOverloaded && !isLastAttempt) {
-        const delay = 1000 * Math.pow(2, attempt);
-        await new Promise((r) => setTimeout(r, delay));
+        await new Promise((r) => setTimeout(r, 1000 * Math.pow(2, attempt)));
         continue;
       }
-
       throw err;
     }
   }
 }
 
+/**
+ * POST /api/chat/:kind/message
+ * Para chats con trader: ?trader=adri o ?trader=juanka
+ * Para chat backtest (compartido): sin parametro trader
+ */
 router.post('/:kind/message', upload.single('image'), async (req, res) => {
   try {
     const kind = req.params.kind;
     if (!['trading', 'gestion', 'backtesting'].includes(kind)) {
       return res.status(400).json({ error: 'Tipo de chat invalido' });
     }
+
+    // trader_slug: query param o body, solo aplica a trading/gestion
+    const traderSlug = (kind === 'backtesting') ? null
+      : (req.query.trader || req.body.trader_slug || 'adri');
+
+    if (traderSlug && !['adri', 'juanka'].includes(traderSlug)) {
+      return res.status(400).json({ error: 'Trader invalido' });
+    }
+
     const message = (req.body.message || '').trim();
     if (!message && !req.file) return res.status(400).json({ error: 'Mensaje vacio' });
 
     const userContentText = message || (req.file ? '(captura)' : '');
 
+    // session_id incluye trader para separar conversaciones
+    const sessionId = kind === 'backtesting' ? 'backtesting_main' : (kind + '_' + traderSlug);
+
     await query(
-      'INSERT INTO chat_messages (session_id, role, content, chat_kind, image_url) VALUES ($1, $2, $3, $4, $5)',
-      [kind + '_main', 'user', userContentText, kind, req.file ? '[img]' : null]
+      'INSERT INTO chat_messages (session_id, role, content, chat_kind, trader_slug, image_url) VALUES ($1, $2, $3, $4, $5, $6)',
+      [sessionId, 'user', userContentText, kind, traderSlug, req.file ? '[img]' : null]
     );
 
-    const history = await query(
-      'SELECT role, content FROM chat_messages WHERE chat_kind = $1 AND content IS NOT NULL AND content != $2 ORDER BY created_at DESC LIMIT $3',
-      [kind, '', HISTORY_LIMIT[kind]]
-    );
+    // History filtrado por chat_kind + trader_slug
+    let historySql = 'SELECT role, content FROM chat_messages WHERE chat_kind = $1 AND content IS NOT NULL AND content != $2';
+    const historyParams = [kind, ''];
+    if (traderSlug) {
+      historySql += ' AND trader_slug = $3';
+      historyParams.push(traderSlug);
+    }
+    historySql += ' ORDER BY created_at DESC LIMIT ' + HISTORY_LIMIT[kind];
+    const history = await query(historySql, historyParams);
     const orderedHistory = history.rows.reverse();
-    const sharedContext = await buildSharedContext(kind);
+
+    const sharedContext = await buildSharedContext(kind, traderSlug);
 
     const messages = orderedHistory.slice(0, -1)
       .filter((m) => m.content && m.content.trim().length > 0)
@@ -106,7 +118,15 @@ router.post('/:kind/message', upload.single('image'), async (req, res) => {
     lastUserContent.push({ type: 'text', text: message || 'Analiza esta captura.' });
     messages.push({ role: 'user', content: lastUserContent });
 
-    const systemPrompt = PROMPTS_BY_KIND[kind] + '\n\nCONTEXTO:\n' + JSON.stringify(sharedContext);
+    // Prompt enriquecido: indicar a Claude el trader actual
+    let systemPrompt = PROMPTS_BY_KIND[kind];
+    if (traderSlug) {
+      const traderName = traderSlug.toUpperCase();
+      systemPrompt = systemPrompt.replace(/ALADIN/g, traderName) +
+        '\n\nESTE CHAT PERTENECE AL TRADER: ' + traderName +
+        '. Todas las operaciones (log_trade, create_account, etc) deben asignarse a este trader pasando trader_slug="' + traderSlug + '".';
+    }
+    systemPrompt += '\n\nCONTEXTO:\n' + JSON.stringify(sharedContext);
 
     let response;
     const accumulatedToolCalls = [];
@@ -125,14 +145,14 @@ router.post('/:kind/message', upload.single('image'), async (req, res) => {
       };
 
       if (THINKING_CONFIG[kind].enabled) {
-        apiParams.thinking = {
-          type: 'enabled',
-          budget_tokens: THINKING_CONFIG[kind].budget
-        };
+        apiParams.thinking = { type: 'enabled', budget_tokens: THINKING_CONFIG[kind].budget };
       }
 
       response = await callClaudeWithRetry(apiParams);
-      console.log('[' + kind + '] L' + safetyCounter + ' stop=' + response.stop_reason + ' in=' + response.usage?.input_tokens + ' out=' + response.usage?.output_tokens);
+      console.log('[' + kind + (traderSlug ? '/' + traderSlug : '') + '] L' + safetyCounter +
+        ' stop=' + response.stop_reason +
+        ' in=' + response.usage?.input_tokens +
+        ' out=' + response.usage?.output_tokens);
 
       if (response.stop_reason !== 'tool_use') break;
 
@@ -148,9 +168,14 @@ router.post('/:kind/message', upload.single('image'), async (req, res) => {
           executedSomething = true;
           continue;
         }
-        const result = await executeTool(tu.name, tu.input);
+        // Inyectar trader_slug automaticamente si no esta presente y aplica
+        const toolInput = { ...tu.input };
+        if (traderSlug && ['log_trade', 'create_account'].includes(tu.name) && !toolInput.trader_slug) {
+          toolInput.trader_slug = traderSlug;
+        }
+        const result = await executeTool(tu.name, toolInput);
         console.log('[' + kind + '] tool ' + tu.name);
-        accumulatedToolCalls.push({ name: tu.name, input: tu.input, result });
+        accumulatedToolCalls.push({ name: tu.name, input: toolInput, result });
         toolResults.push({ type: 'tool_result', tool_use_id: tu.id, content: JSON.stringify(result) });
         executedSomething = true;
       }
@@ -167,8 +192,8 @@ router.post('/:kind/message', upload.single('image'), async (req, res) => {
       .join('\n') || '(Respuesta vacia)';
 
     await query(
-      'INSERT INTO chat_messages (session_id, role, content, chat_kind, tool_calls) VALUES ($1, $2, $3, $4, $5)',
-      [kind + '_main', 'assistant', assistantText, kind, accumulatedToolCalls.length ? JSON.stringify(accumulatedToolCalls) : null]
+      'INSERT INTO chat_messages (session_id, role, content, chat_kind, trader_slug, tool_calls) VALUES ($1, $2, $3, $4, $5, $6)',
+      [sessionId, 'assistant', assistantText, kind, traderSlug, accumulatedToolCalls.length ? JSON.stringify(accumulatedToolCalls) : null]
     );
 
     res.json({ message: assistantText, tool_calls: accumulatedToolCalls });
@@ -187,10 +212,18 @@ router.post('/:kind/message', upload.single('image'), async (req, res) => {
 
 router.get('/:kind/history', async (req, res) => {
   try {
-    const result = await query(
-      'SELECT role, content, created_at, image_url FROM chat_messages WHERE chat_kind = $1 ORDER BY created_at ASC LIMIT 200',
-      [req.params.kind]
-    );
+    const kind = req.params.kind;
+    const traderSlug = kind === 'backtesting' ? null : (req.query.trader || 'adri');
+
+    let sql = 'SELECT role, content, created_at, image_url FROM chat_messages WHERE chat_kind = $1';
+    const params = [kind];
+    if (traderSlug) {
+      sql += ' AND trader_slug = $2';
+      params.push(traderSlug);
+    }
+    sql += ' ORDER BY created_at ASC LIMIT 200';
+
+    const result = await query(sql, params);
     res.json(result.rows);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -199,7 +232,16 @@ router.get('/:kind/history', async (req, res) => {
 
 router.delete('/:kind/history', async (req, res) => {
   try {
-    await query('DELETE FROM chat_messages WHERE chat_kind = $1', [req.params.kind]);
+    const kind = req.params.kind;
+    const traderSlug = kind === 'backtesting' ? null : (req.query.trader || 'adri');
+
+    let sql = 'DELETE FROM chat_messages WHERE chat_kind = $1';
+    const params = [kind];
+    if (traderSlug) {
+      sql += ' AND trader_slug = $2';
+      params.push(traderSlug);
+    }
+    await query(sql, params);
     res.json({ ok: true });
   } catch (err) {
     res.status(500).json({ error: err.message });

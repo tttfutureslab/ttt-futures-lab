@@ -10,7 +10,9 @@ import rulesRouter from './routes/rules.js';
 import chatRouter from './routes/chat.js';
 import authRouter from './routes/auth.js';
 import dashboardRouter from './routes/dashboard.js';
+import dashboardStatsRouter from './routes/dashboardStats.js';
 import sessionsStatsRouter from './routes/sessionsStats.js';
+import tradersRouter from './routes/traders.js';
 import { requireAuth, isAuthConfigured } from './services/auth.js';
 import { scheduleRulesRefresh } from './services/rulesRefresh.js';
 
@@ -30,6 +32,7 @@ app.use('/api/rules', rulesRouter);
 app.use('/api/chat', chatRouter);
 app.use('/api/dashboard', dashboardRouter);
 app.use('/api/sessions-stats', sessionsStatsRouter);
+app.use('/api/traders', tradersRouter);
 
 const frontendDist = path.join(__dirname, '..', '..', 'frontend', 'dist');
 app.use(express.static(frontendDist));

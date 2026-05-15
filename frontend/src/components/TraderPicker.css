@@ -1,0 +1,98 @@
+.trader-picker {
+  position: fixed;
+  inset: 0;
+  background: radial-gradient(circle at center, #1a1a1a 0%, #050505 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 500;
+  animation: trader-fade-in 0.5s ease;
+}
+@keyframes trader-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.trader-picker-inner {
+  text-align: center;
+  padding: 32px;
+  max-width: 700px;
+  width: 100%;
+}
+
+.trader-picker-title {
+  font-size: 14px;
+  letter-spacing: 0.35em;
+  color: var(--silver);
+  font-weight: 800;
+  margin-bottom: 8px;
+}
+
+.trader-picker-sub {
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  color: var(--silver-dim);
+  text-transform: uppercase;
+  margin-bottom: 40px;
+}
+
+.trader-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 20px;
+}
+
+.trader-card {
+  background: linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.01));
+  border: 1px solid var(--silver-line);
+  border-radius: 16px;
+  padding: 32px 24px;
+  cursor: pointer;
+  font-family: inherit;
+  color: var(--silver);
+  transition: all 0.25s ease;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  position: relative;
+  overflow: hidden;
+}
+.trader-card:hover {
+  transform: translateY(-4px);
+  border-color: var(--trader-color);
+  box-shadow: 0 10px 30px rgba(0,0,0,0.4), 0 0 30px var(--trader-color);
+}
+.trader-card:hover .trader-card-arrow {
+  transform: translateX(4px);
+  opacity: 1;
+}
+
+.trader-avatar {
+  width: 70px;
+  height: 70px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 32px;
+  font-weight: 800;
+  letter-spacing: 0;
+}
+
+.trader-name {
+  font-size: 18px;
+  font-weight: 800;
+  letter-spacing: 0.25em;
+}
+
+.trader-card-arrow {
+  font-size: 18px;
+  color: var(--silver-dim);
+  opacity: 0.5;
+  transition: all 0.25s ease;
+}
+
+@media (max-width: 480px) {
+  .trader-cards { grid-template-columns: 1fr; }
+}

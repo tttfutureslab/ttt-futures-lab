@@ -11,6 +11,7 @@ export const TOOLS_TRADING = [
       type: 'object',
       properties: {
         account_label: { type: 'string' },
+        trader_slug: { type: 'string', enum: ['adri', 'juanka'], description: 'Trader owner del trade (default adri si no se especifica)' },
         asset: { type: 'string' },
         direction: { type: 'string', enum: ['long', 'short'] },
         contracts: { type: 'number' },
@@ -96,18 +97,21 @@ export const TOOLS_GESTION = [
   },
   {
     name: 'create_account',
-    description: 'Crea cuenta nueva.',
+    description: 'Crea una cuenta nueva. ANTES de llamar esta tool DEBES preguntar al usuario (uno por uno): 1) prop firm (topone/tradeify/mffu), 2) numero o nombre identificador de la cuenta, 3) fase (challenge/funded), 4) tipo de cuenta (elite_daily/elite_access/elite_static/growth/select/flex/starter/expert). Solo llama esta tool cuando tengas TODOS los datos.',
     input_schema: {
       type: 'object',
       properties: {
+        trader_slug: { type: 'string', enum: ['adri', 'juanka'], description: 'Trader propietario' },
         prop_firm_slug: { type: 'string', enum: ['topone', 'tradeify', 'mffu'] },
-        account_label: { type: 'string' },
-        account_type: { type: 'string', enum: ['evaluation', 'funded', 'sim_funded'] },
-        size_usd: { type: 'number' },
+        account_label: { type: 'string', description: 'Nombre identificador interno, ej "TOPONE 3 ADRI"' },
+        external_account_number: { type: 'string', description: 'Numero/codigo externo de la cuenta en la prop firm' },
+        phase: { type: 'string', enum: ['challenge', 'funded'], description: 'Fase: challenge (evaluacion) o funded (financiada)' },
+        account_type_name: { type: 'string', enum: ['elite_daily','elite_access','elite_static','growth','select','flex','starter','expert'], description: 'Tipo de cuenta especifico de la prop firm' },
+        size_usd: { type: 'number', description: 'Tamaño de la cuenta en USD' },
         daily_loss: { type: 'number' },
         trailing_dd: { type: 'number' }
       },
-      required: ['prop_firm_slug', 'account_label', 'size_usd']
+      required: ['prop_firm_slug', 'account_label', 'phase', 'account_type_name', 'size_usd']
     }
   },
   {
@@ -292,15 +296,35 @@ async function recomputeAccountSnapshot(accountId, deltaPnl, note = '') {
 }
 
 async function execLogTrade(input) {
-  const account = await findAccountId(input.account_label);
+  // Si no hay account_label pero hay trader, buscar cuenta activa de ese trader
+  let account = null;
+  if (input.account_label) {
+    account = await findAccountId(input.account_label);
+  } else if (input.trader_slug) {
+    const acc = await query(`
+      SELECT a.id, a.account_label FROM accounts a
+      JOIN traders t ON t.id = a.trader_id
+      WHERE a.status = 'active' AND t.slug = $1
+      ORDER BY a.created_at DESC LIMIT 1
+    `, [input.trader_slug]);
+    if (acc.rows.length > 0) account = { id: acc.rows[0].id, label: acc.rows[0].account_label };
+  } else {
+    account = await findAccountId(null);
+  }
   if (!account) return { error: 'No se encontro cuenta activa' };
+
+  // Obtener trader_id de la cuenta para guardarlo en el trade
+  const traderRes = await query('SELECT trader_id FROM accounts WHERE id = $1', [account.id]);
+  const traderId = traderRes.rows[0]?.trader_id;
+
   const tradeResult = await query(`
-    INSERT INTO trades (account_id, asset, direction, contracts, entry_price, exit_price, result, pnl_usd,
+    INSERT INTO trades (account_id, trader_id, asset, direction, contracts, entry_price, exit_price, result, pnl_usd,
       session, quarter, ict_setup, reason, claude_analysis)
-    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
     RETURNING id, trade_at, result, pnl_usd
-  `, [account.id, input.asset, input.direction, input.contracts, input.entry_price, input.exit_price,
+  `, [account.id, traderId, input.asset, input.direction, input.contracts, input.entry_price, input.exit_price,
       input.result, input.pnl_usd, input.session, input.quarter, input.ict_setup, input.reason, input.claude_analysis]);
+
   const pnl = Number(input.pnl_usd || 0);
   const newState = await recomputeAccountSnapshot(account.id, pnl, `Trade ${input.result} ${pnl >= 0 ? '+' : ''}${pnl}`);
   return { ok: true, trade: tradeResult.rows[0], account: account.label,
@@ -376,12 +400,40 @@ async function execSaveSnapshot(input) {
 async function execCreateAccount(input) {
   const firm = await query('SELECT id FROM prop_firms WHERE slug = $1', [input.prop_firm_slug]);
   if (firm.rows.length === 0) return { error: 'Prop firm no encontrada' };
+
+  const traderSlug = input.trader_slug || 'adri';
+  const trader = await query('SELECT id FROM traders WHERE slug = $1', [traderSlug]);
+  if (trader.rows.length === 0) return { error: 'Trader no encontrado: ' + traderSlug };
+
+  // Verificar que el tipo de cuenta existe para esa firm
+  if (input.account_type_name) {
+    const typeCheck = await query(
+      'SELECT id FROM account_types WHERE prop_firm_id = $1 AND type_name = $2 AND is_active = TRUE',
+      [firm.rows[0].id, input.account_type_name]
+    );
+    if (typeCheck.rows.length === 0) {
+      return { error: 'Tipo de cuenta "' + input.account_type_name + '" no existe para ' + input.prop_firm_slug };
+    }
+  }
+
   const result = await query(`
-    INSERT INTO accounts (prop_firm_id, account_label, account_type, size_usd, daily_loss, trailing_dd)
-    VALUES ($1, $2, $3, $4, $5, $6) RETURNING id, account_label, account_type, size_usd
-  `, [firm.rows[0].id, input.account_label, input.account_type || 'evaluation',
-      input.size_usd, input.daily_loss, input.trailing_dd]);
-  return { ok: true, account: result.rows[0] };
+    INSERT INTO accounts (
+      prop_firm_id, trader_id, account_label, external_account_number,
+      phase, account_type_name, size_usd, daily_loss, trailing_dd
+    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+    RETURNING id, account_label, account_type_name, phase, size_usd
+  `, [
+    firm.rows[0].id, trader.rows[0].id, input.account_label, input.external_account_number,
+    input.phase || 'challenge', input.account_type_name,
+    input.size_usd, input.daily_loss, input.trailing_dd
+  ]);
+
+  return {
+    ok: true,
+    account: result.rows[0],
+    trader: traderSlug,
+    message: `Cuenta "${result.rows[0].account_label}" creada (${input.prop_firm_slug.toUpperCase()} ${input.account_type_name} ${input.phase}, ${input.size_usd}, trader: ${traderSlug.toUpperCase()})`
+  };
 }
 
 async function execUpdateStatus(input) {

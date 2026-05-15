@@ -1,25 +1,32 @@
 import { useEffect, useRef, useState } from 'react';
+import { getCurrentTrader } from '../lib/traderContext';
 import './ChatPanel.css';
 
 const API = '/api';
 
-export default function ChatPanel({ kind, title, subtitle, placeholder, color = '#e8e8e8' }) {
+export default function ChatPanel({ kind, title, subtitle, placeholder, color = '#e8e8e8', useTrader = true }) {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
   const [pendingImage, setPendingImage] = useState(null);
   const [loading, setLoading] = useState(false);
   const bottomRef = useRef(null);
 
+  // useTrader=true → trading/gestion. useTrader=false → backtest compartido.
+  const traderSlug = useTrader ? getCurrentTrader() : null;
+
+  function buildUrl(path) {
+    const qs = traderSlug ? `?trader=${traderSlug}` : '';
+    return `${API}${path}${qs}`;
+  }
+
   useEffect(() => {
-    fetch(`${API}/chat/${kind}/history`, { credentials: 'include' })
+    fetch(buildUrl(`/chat/${kind}/history`), { credentials: 'include' })
       .then((r) => r.json())
       .then((data) => setMessages(Array.isArray(data) ? data : []))
       .catch(() => setMessages([]));
-  }, [kind]);
+  }, [kind, traderSlug]);
 
-  useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages, loading]);
+  useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages, loading]);
 
   useEffect(() => {
     function handlePaste(e) {
@@ -51,13 +58,14 @@ export default function ChatPanel({ kind, title, subtitle, placeholder, color = 
     const formData = new FormData();
     formData.append('message', input.trim());
     if (pendingImage) formData.append('image', pendingImage.file);
+    if (traderSlug) formData.append('trader_slug', traderSlug);
 
     setInput('');
     setPendingImage(null);
     setLoading(true);
 
     try {
-      const res = await fetch(`${API}/chat/${kind}/message`, {
+      const res = await fetch(buildUrl(`/chat/${kind}/message`), {
         method: 'POST', body: formData, credentials: 'include'
       });
       if (!res.ok) {
@@ -74,7 +82,7 @@ export default function ChatPanel({ kind, title, subtitle, placeholder, color = 
 
   async function handleClear() {
     if (!confirm('Borrar historial de este chat?')) return;
-    await fetch(`${API}/chat/${kind}/history`, { method: 'DELETE', credentials: 'include' });
+    await fetch(buildUrl(`/chat/${kind}/history`), { method: 'DELETE', credentials: 'include' });
     setMessages([]);
   }
 
@@ -85,11 +93,13 @@ export default function ChatPanel({ kind, title, subtitle, placeholder, color = 
     }
   }
 
+  const traderLabel = traderSlug ? ` · ${traderSlug.toUpperCase()}` : '';
+
   return (
     <div className="chat-panel">
       <div className="chat-head" style={{ borderColor: `${color}33` }}>
         <div>
-          <h2 className="chat-title" style={{ color }}>{title}</h2>
+          <h2 className="chat-title" style={{ color }}>{title}{traderLabel}</h2>
           <p className="chat-subtitle">{subtitle}</p>
         </div>
         <button className="chat-clear" onClick={handleClear} title="Limpiar">↺</button>

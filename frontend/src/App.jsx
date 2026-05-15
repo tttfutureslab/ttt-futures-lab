@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import SplashScreen from './components/SplashScreen';
 import LoginScreen from './components/LoginScreen';
+import TraderPicker from './components/TraderPicker';
 import AppHeader from './components/AppHeader';
 import PageBurjWrapper from './components/PageBurjWrapper';
 import IntroAudio from './components/IntroAudio';
@@ -13,11 +14,12 @@ import ChatBacktesting from './pages/ChatBacktesting';
 import Sessions from './pages/Sessions';
 import Rules from './pages/Rules';
 import { getAuthStatus } from './lib/api';
+import { getCurrentTrader, clearCurrentTrader } from './lib/traderContext';
 
-function AppContent({ onLogout }) {
+function AppContent({ onLogout, onSwitchTrader }) {
   return (
     <>
-      <AppHeader onLogout={onLogout} />
+      <AppHeader onLogout={onLogout} onSwitchTrader={onSwitchTrader} />
       <main className="main-content">
         <PageBurjWrapper>
           <Routes>
@@ -40,7 +42,12 @@ export default function App() {
 
   useEffect(() => {
     getAuthStatus()
-      .then((res) => setPhase(res.authenticated ? 'splash' : 'login'))
+      .then((res) => {
+        if (!res.authenticated) return setPhase('login');
+        // Si ya hay trader elegido, ir a splash
+        if (getCurrentTrader()) setPhase('splash');
+        else setPhase('trader-picker');
+      })
       .catch(() => setPhase('login'));
   }, []);
 
@@ -56,6 +63,11 @@ export default function App() {
     return () => clearTimeout(failsafe);
   }, [phase]);
 
+  function handleSwitchTrader() {
+    clearCurrentTrader();
+    setPhase('trader-picker');
+  }
+
   if (phase === 'checking') {
     return (
       <div style={{
@@ -67,8 +79,17 @@ export default function App() {
     );
   }
 
-  if (phase === 'login') return <LoginScreen onSuccess={() => setPhase('splash')} />;
-  if (phase === 'splash') return <SplashScreen mode="auto" onEnter={() => setPhase('app')} />;
+  if (phase === 'login') {
+    return <LoginScreen onSuccess={() => setPhase('trader-picker')} />;
+  }
+
+  if (phase === 'trader-picker') {
+    return <TraderPicker onSelect={() => setPhase('splash')} />;
+  }
+
+  if (phase === 'splash') {
+    return <SplashScreen mode="auto" onEnter={() => setPhase('app')} />;
+  }
 
   return (
     <BrowserRouter>
@@ -78,7 +99,7 @@ export default function App() {
         {showOpeningBurj && (
           <BurjLoader size="large" duration={2400} onDone={() => setShowOpeningBurj(false)} />
         )}
-        <AppContent onLogout={() => setPhase('login')} />
+        <AppContent onLogout={() => setPhase('login')} onSwitchTrader={handleSwitchTrader} />
       </div>
     </BrowserRouter>
   );
