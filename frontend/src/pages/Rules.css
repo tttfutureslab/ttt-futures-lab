@@ -1,0 +1,211 @@
+.rules-page {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* ── Banner cambios recientes ────────────── */
+.changes-banner {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 10px 16px;
+  background: linear-gradient(90deg, rgba(247,198,107,0.08), rgba(247,198,107,0.02));
+  border: 1px solid rgba(247,198,107,0.25);
+  border-radius: 10px;
+  overflow: hidden;
+}
+.changes-badge {
+  font-size: 11px;
+  letter-spacing: 0.15em;
+  color: var(--accent-amber);
+  font-weight: 700;
+  white-space: nowrap;
+  text-transform: uppercase;
+}
+.changes-scroll {
+  display: flex;
+  gap: 12px;
+  overflow-x: auto;
+  flex: 1;
+}
+.changes-scroll::-webkit-scrollbar { height: 4px; }
+.change-pill {
+  font-size: 11px;
+  color: var(--silver);
+  white-space: nowrap;
+  padding: 4px 10px;
+  background: rgba(255,255,255,0.04);
+  border-radius: 4px;
+  letter-spacing: 0.03em;
+}
+.change-date { color: var(--silver-dim); }
+
+/* ── Header ────────────────────────────────── */
+.rules-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+.rules-title {
+  margin: 0;
+  font-size: 13px;
+  letter-spacing: 0.25em;
+  color: var(--silver);
+  font-weight: 700;
+}
+.rules-update {
+  margin: 4px 0 0 0;
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  color: var(--silver-dim);
+}
+
+/* ── Empty ─────────────────────────────────── */
+.rules-empty {
+  text-align: center;
+  padding: 60px 20px;
+  color: var(--silver-dim);
+}
+.rules-empty p { margin: 8px 0; }
+.rules-empty .hint { font-size: 12px; line-height: 1.6; }
+
+/* ── Grid 3 columnas ───────────────────────── */
+.rules-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px;
+}
+
+.firm-column {
+  background: linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0.01));
+  border: 1px solid var(--silver-line);
+  border-radius: 12px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.firm-header {
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--silver-line);
+  background: rgba(0,0,0,0.3);
+  text-align: center;
+}
+
+.firm-name {
+  margin: 0;
+  font-size: 13px;
+  letter-spacing: 0.3em;
+  font-weight: 800;
+  color: var(--silver);
+}
+
+/* Colores sutiles por firm */
+.firm-topone .firm-header { border-bottom-color: rgba(108, 217, 126, 0.3); }
+.firm-topone .firm-name { color: #6cd97e; }
+.firm-tradeify .firm-header { border-bottom-color: rgba(163, 200, 255, 0.3); }
+.firm-tradeify .firm-name { color: #a3c8ff; }
+.firm-mffu .firm-header { border-bottom-color: rgba(247, 198, 107, 0.3); }
+.firm-mffu .firm-name { color: #f7c66b; }
+
+.firm-empty {
+  padding: 24px 16px;
+  text-align: center;
+  color: var(--silver-dim);
+  font-size: 12px;
+}
+.firm-empty p { margin: 4px 0; }
+.hint-small {
+  font-size: 10px;
+  color: rgba(255,255,255,0.3);
+  font-style: italic;
+}
+
+.firm-body {
+  display: flex;
+  flex-direction: column;
+  padding: 12px;
+  gap: 16px;
+}
+
+/* ── Categoría ─────────────────────────────── */
+.rule-category {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.cat-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding-bottom: 4px;
+  border-bottom: 1px dashed var(--silver-line);
+}
+.cat-icon { font-size: 13px; }
+.cat-label {
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  color: var(--silver-dim);
+  text-transform: uppercase;
+  font-weight: 700;
+}
+
+/* ── Item de norma ─────────────────────────── */
+.cat-rules {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.rule-item {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: rgba(255,255,255,0.02);
+  align-items: center;
+  position: relative;
+}
+.rule-item:hover {
+  background: rgba(255,255,255,0.04);
+}
+.rule-item.changed {
+  border-left: 2px solid var(--accent-amber);
+  padding-left: 8px;
+}
+
+.rule-label {
+  font-size: 12px;
+  color: var(--silver-dim);
+  letter-spacing: 0.02em;
+}
+
+.rule-value {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--silver);
+  text-align: right;
+}
+
+.rule-change-pill {
+  grid-column: 1 / -1;
+  font-size: 9px;
+  color: var(--accent-amber);
+  letter-spacing: 0.1em;
+  margin-top: 2px;
+}
+
+/* ── Responsive ────────────────────────────── */
+@media (max-width: 1024px) {
+  .rules-grid { grid-template-columns: 1fr 1fr; }
+}
+@media (max-width: 640px) {
+  .rules-grid { grid-template-columns: 1fr; }
+  .rules-header { flex-direction: column; gap: 12px; }
+  .changes-banner { flex-direction: column; align-items: stretch; gap: 8px; }
+  .changes-scroll { flex-wrap: wrap; }
+  .change-pill { white-space: normal; }
+}
