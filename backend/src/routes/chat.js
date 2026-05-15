@@ -24,7 +24,7 @@ const PROMPTS_BY_KIND = {
 // Backtesting: medio
 const THINKING_BUDGET = {
   trading: 2000,      // ~2K tokens de pensar - analisis tecnico complejo
-  gestion: 1000,      // 1K tokens - decisiones mas operativas
+  gestion: 1024,      // 1K tokens - decisiones mas operativas
   backtesting: 1500   // 1.5K - analisis estadistico moderado
 };
 
