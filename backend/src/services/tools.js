@@ -2,7 +2,7 @@ import { query } from '../db/pool.js';
 
 export const TOOLS_TRADING = [{
   name: 'log_trade',
-  description: 'Registra un trade real en el diario. Usalo cuando el usuario te diga que cerro una operacion.',
+  description: 'Registra un trade real. ACTUALIZA AUTOMATICAMENTE el balance de la cuenta sumando el pnl_usd al balance anterior.',
   input_schema: {
     type: 'object',
     properties: {
@@ -13,14 +13,14 @@ export const TOOLS_TRADING = [{
       entry_price: { type: 'number' },
       exit_price: { type: 'number' },
       result: { type: 'string', enum: ['TP', 'SL', 'BE', 'partial'] },
-      pnl_usd: { type: 'number' },
+      pnl_usd: { type: 'number', description: 'IMPORTANTE: pasa el pnl_usd para que se actualice el balance' },
       session: { type: 'string', enum: ['Asia', 'London', 'NY AM', 'NY PM'] },
       quarter: { type: 'string', enum: ['Q1', 'Q2', 'Q3', 'Q4'] },
       ict_setup: { type: 'string' },
       reason: { type: 'string' },
       claude_analysis: { type: 'string' }
     },
-    required: ['result']
+    required: ['result', 'pnl_usd']
   }
 }];
 
@@ -91,26 +91,73 @@ export async function executeTool(toolName, input) {
 }
 
 async function execLogTrade(input) {
+  // 1. Encontrar la cuenta
   let accountId = null;
+  let accountLabel = input.account_label;
   if (input.account_label) {
-    const acc = await query('SELECT id FROM accounts WHERE account_label = $1 LIMIT 1', [input.account_label]);
-    if (acc.rows.length > 0) accountId = acc.rows[0].id;
+    const acc = await query('SELECT id, account_label FROM accounts WHERE account_label ILIKE $1 LIMIT 1', [`%${input.account_label}%`]);
+    if (acc.rows.length > 0) {
+      accountId = acc.rows[0].id;
+      accountLabel = acc.rows[0].account_label;
+    }
   } else {
-    const acc = await query("SELECT id FROM accounts WHERE status = 'active' ORDER BY created_at DESC LIMIT 1");
-    if (acc.rows.length > 0) accountId = acc.rows[0].id;
+    const acc = await query("SELECT id, account_label FROM accounts WHERE status = 'active' ORDER BY created_at DESC LIMIT 1");
+    if (acc.rows.length > 0) {
+      accountId = acc.rows[0].id;
+      accountLabel = acc.rows[0].account_label;
+    }
   }
-  const result = await query(`
+
+  if (!accountId) {
+    return { error: 'No se encontro ninguna cuenta activa. Pega primero una captura del dashboard en Chat Gestion.' };
+  }
+
+  // 2. Guardar el trade
+  const tradeResult = await query(`
     INSERT INTO trades (account_id, asset, direction, contracts, entry_price, exit_price, result, pnl_usd,
       session, quarter, ict_setup, reason, claude_analysis)
     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
     RETURNING id, trade_at, result, pnl_usd
   `, [accountId, input.asset, input.direction, input.contracts, input.entry_price, input.exit_price,
       input.result, input.pnl_usd, input.session, input.quarter, input.ict_setup, input.reason, input.claude_analysis]);
-  return { ok: true, trade: result.rows[0] };
+
+  // 3. CREAR SNAPSHOT NUEVO con balance actualizado
+  // Obtener último snapshot de la cuenta
+  const lastSnap = await query(`
+    SELECT balance, pnl_today, pnl_total, trailing_dd_now, best_day_pnl, trading_days
+    FROM snapshots WHERE account_id = $1 ORDER BY snapshot_at DESC LIMIT 1
+  `, [accountId]);
+
+  const pnl = Number(input.pnl_usd || 0);
+  const prevBalance = lastSnap.rows[0] ? Number(lastSnap.rows[0].balance || 0) : 0;
+  const prevPnlToday = lastSnap.rows[0] ? Number(lastSnap.rows[0].pnl_today || 0) : 0;
+  const prevPnlTotal = lastSnap.rows[0] ? Number(lastSnap.rows[0].pnl_total || 0) : 0;
+  const prevBestDay = lastSnap.rows[0] ? Number(lastSnap.rows[0].best_day_pnl || 0) : 0;
+
+  const newBalance = prevBalance + pnl;
+  const newPnlToday = prevPnlToday + pnl;
+  const newPnlTotal = prevPnlTotal + pnl;
+  const newBestDay = Math.max(prevBestDay, newPnlToday);
+
+  const snapResult = await query(`
+    INSERT INTO snapshots (account_id, balance, equity, pnl_today, pnl_total, best_day_pnl, trading_days, notes)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+    RETURNING balance, pnl_today, pnl_total
+  `, [accountId, newBalance, newBalance, newPnlToday, newPnlTotal, newBestDay,
+      lastSnap.rows[0]?.trading_days || 1,
+      `Auto-snapshot tras trade ${input.result} ${pnl >= 0 ? '+' : ''}${pnl}`]);
+
+  return {
+    ok: true,
+    trade: tradeResult.rows[0],
+    account: accountLabel,
+    balance_updated: snapResult.rows[0],
+    message: `Trade registrado y balance actualizado: ${newBalance.toFixed(2)} USD (${pnl >= 0 ? '+' : ''}${pnl})`
+  };
 }
 
 async function execSaveSnapshot(input) {
-  const acc = await query('SELECT id FROM accounts WHERE account_label = $1', [input.account_label]);
+  const acc = await query('SELECT id FROM accounts WHERE account_label ILIKE $1', [`%${input.account_label}%`]);
   if (acc.rows.length === 0) return { error: `Cuenta "${input.account_label}" no existe. Usa create_account primero.` };
   const result = await query(`
     INSERT INTO snapshots (account_id, balance, equity, pnl_today, pnl_total, trailing_dd_now, best_day_pnl, trading_days)
