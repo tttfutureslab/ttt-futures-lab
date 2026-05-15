@@ -183,3 +183,5 @@ router.delete('/:kind/history', async (req, res) => {
 });
 
 export default router;
+
+// Mini chat especifico de una cuenta (se anyade despues del export default)
