@@ -3,17 +3,11 @@ import { query } from '../db/pool.js';
 
 const router = Router();
 
-/**
- * Devuelve toda la info para el dashboard:
- * - Cuentas activas con último snapshot
- * - Evolución de balance (últimos 30 snapshots por cuenta)
- * - Cálculos derivados: alertas, consistencia, días para payout
- */
 router.get('/', async (req, res) => {
   try {
     const accounts = await query(`
       SELECT
-        a.id, a.account_label, a.size_usd, a.status,
+        a.id, a.account_label, a.size_usd, a.status, a.account_type,
         a.daily_loss AS daily_loss_limit,
         a.trailing_dd AS trailing_dd_limit,
         a.profit_target,
@@ -27,11 +21,17 @@ router.get('/', async (req, res) => {
         ) s) AS last_snapshot
       FROM accounts a
       JOIN prop_firms pf ON pf.id = a.prop_firm_id
-      WHERE a.status = 'active'
-      ORDER BY a.created_at DESC
+      WHERE a.status NOT IN ('archived', 'blown')
+      ORDER BY
+        CASE a.status
+          WHEN 'active' THEN 1
+          WHEN 'passed' THEN 2
+          WHEN 'paused' THEN 3
+          ELSE 4
+        END,
+        a.created_at DESC
     `);
 
-    // Para cada cuenta, traer su historial de balance (últimos 30 snapshots)
     const evolution = {};
     for (const acc of accounts.rows) {
       const hist = await query(`
@@ -42,39 +42,43 @@ router.get('/', async (req, res) => {
       evolution[acc.id] = hist.rows.reverse();
     }
 
-    // Calcular métricas derivadas
     const enriched = accounts.rows.map((a) => {
       const last = a.last_snapshot;
       const alerts = [];
-
-      if (last) {
-        // Daily loss
+      if (last && a.status === 'active') {
         if (a.daily_loss_limit && last.pnl_today < 0) {
           const pct = Math.abs(last.pnl_today / a.daily_loss_limit) * 100;
           if (pct >= 70) alerts.push({ level: pct >= 90 ? 'critical' : 'warning', msg: `Daily loss ${pct.toFixed(0)}% usado` });
         }
-
-        // Trailing drawdown
         if (a.trailing_dd_limit && last.trailing_dd_now) {
           const pct = Math.abs(last.trailing_dd_now / a.trailing_dd_limit) * 100;
           if (pct >= 80) alerts.push({ level: 'critical', msg: `Trailing DD ${pct.toFixed(0)}% usado` });
           else if (pct >= 60) alerts.push({ level: 'warning', msg: `Trailing DD ${pct.toFixed(0)}% usado` });
         }
-
-        // Consistencia (best day / pnl_total)
         if (last.best_day_pnl && last.pnl_total && last.pnl_total > 0) {
           const consistencyPct = (last.best_day_pnl / last.pnl_total) * 100;
-          if (consistencyPct > 30) alerts.push({ level: 'warning', msg: `Best day ${consistencyPct.toFixed(0)}% del total (riesgo)` });
+          if (consistencyPct > 30) alerts.push({ level: 'warning', msg: `Best day ${consistencyPct.toFixed(0)}% del total` });
         }
       }
-
       return { ...a, alerts };
     });
 
-    res.json({
-      accounts: enriched,
-      evolution
-    });
+    res.json({ accounts: enriched, evolution });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Endpoint para listar cuentas archivadas/blown (historico)
+router.get('/archived', async (req, res) => {
+  try {
+    const result = await query(`
+      SELECT a.*, pf.slug AS firm_slug, pf.name AS firm_name
+      FROM accounts a JOIN prop_firms pf ON pf.id = a.prop_firm_id
+      WHERE a.status IN ('archived', 'blown', 'passed')
+      ORDER BY a.updated_at DESC
+    `);
+    res.json(result.rows);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
