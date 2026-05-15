@@ -13,21 +13,18 @@ const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 
 const WEB_SEARCH_TOOL = { type: 'web_search_20250305', name: 'web_search' };
 const ALL_TOOLS = [...TOOLS_TRADING, ...TOOLS_GESTION, ...TOOLS_BACKTESTING, WEB_SEARCH_TOOL];
 
-// Backtest usa prompt ligero, sin extended thinking
 const PROMPTS_BY_KIND = {
   trading: PROMPT_TRADING,
   gestion: PROMPT_GESTION,
   backtesting: PROMPT_BACKTESTING_LIGHT
 };
 
-// Extended Thinking SOLO en trading y gestion (donde realmente ayuda)
 const THINKING_CONFIG = {
   trading:     { enabled: true,  budget: 2000 },
   gestion:     { enabled: true,  budget: 1500 },
   backtesting: { enabled: false, budget: 0 }
 };
 
-// History por chat - trading y gestion mas, backtest minimo
 const HISTORY_LIMIT = {
   trading: 25,
   gestion: 25,
@@ -56,7 +53,7 @@ async function callClaudeWithRetry(params, maxRetries = 3) {
           err.userMessage = `Rate limit. Espera ${retryAfter}s.`;
           throw err;
         }
-        console.log(`[Claude] 429 retry-after ${retryAfter}s`);
+        console.log('[Claude] 429 retry-after ' + retryAfter + 's');
         await new Promise((r) => setTimeout(r, retryAfter * 1000));
         continue;
       }
@@ -89,114 +86,8 @@ router.post('/:kind/message', upload.single('image'), async (req, res) => {
     );
 
     const history = await query(
-      `SELECT role, content FROM chat_messages
-       WHERE chat_kind = $1 AND content IS NOT NULL AND content != ''
-       ORDER BY created_at DESC LIMIT $2`,
-      [kind, HISTORY_LIMIT[kind]]
-    );
-    const orderedHistory = history.rows.reverse();
-    const sharedContext = await buildSharedContext(kind);
-
-    const messages = ord
-cd ~/OneDrive/Desktop/ttt-futures-lab
-
-# ─── chat.js optimizado: backtest barato, trading/gestion potentes ──
-cat > backend/src/routes/chat.js << 'EOF'
-import { Router } from 'express';
-import multer from 'multer';
-import { claude, CLAUDE_MODEL } from '../services/claude.js';
-import { query } from '../db/pool.js';
-import { buildSharedContext } from '../services/sharedContext.js';
-import { TOOLS_TRADING, TOOLS_GESTION, TOOLS_BACKTESTING, executeTool } from '../services/tools.js';
-import { PROMPT_TRADING, PROMPT_GESTION, PROMPT_BACKTESTING } from '../services/prompts.js';
-import { PROMPT_BACKTESTING_LIGHT } from '../services/prompts-backtest.js';
-
-const router = Router();
-const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
-
-const WEB_SEARCH_TOOL = { type: 'web_search_20250305', name: 'web_search' };
-const ALL_TOOLS = [...TOOLS_TRADING, ...TOOLS_GESTION, ...TOOLS_BACKTESTING, WEB_SEARCH_TOOL];
-
-// Backtest usa prompt ligero, sin extended thinking
-const PROMPTS_BY_KIND = {
-  trading: PROMPT_TRADING,
-  gestion: PROMPT_GESTION,
-  backtesting: PROMPT_BACKTESTING_LIGHT
-};
-
-// Extended Thinking SOLO en trading y gestion (donde realmente ayuda)
-const THINKING_CONFIG = {
-  trading:     { enabled: true,  budget: 2000 },
-  gestion:     { enabled: true,  budget: 1500 },
-  backtesting: { enabled: false, budget: 0 }
-};
-
-// History por chat - trading y gestion mas, backtest minimo
-const HISTORY_LIMIT = {
-  trading: 25,
-  gestion: 25,
-  backtesting: 8
-};
-
-const MAX_TOKENS = {
-  trading: 6000,
-  gestion: 4500,
-  backtesting: 1500
-};
-
-async function callClaudeWithRetry(params, maxRetries = 3) {
-  for (let attempt = 0; attempt < maxRetries; attempt++) {
-    try {
-      return await claude.messages.create(params);
-    } catch (err) {
-      const status = err.status;
-      const isOverloaded = status === 529 || (err.message || '').includes('overloaded');
-      const isRateLimit = status === 429;
-      const isLastAttempt = attempt === maxRetries - 1;
-
-      if (isRateLimit) {
-        const retryAfter = parseInt(err.headers?.['retry-after']) || 30;
-        if (isLastAttempt) {
-          err.userMessage = `Rate limit. Espera ${retryAfter}s.`;
-          throw err;
-        }
-        console.log(`[Claude] 429 retry-after ${retryAfter}s`);
-        await new Promise((r) => setTimeout(r, retryAfter * 1000));
-        continue;
-      }
-
-      if (isOverloaded && !isLastAttempt) {
-        const delay = 1000 * Math.pow(2, attempt);
-        await new Promise((r) => setTimeout(r, delay));
-        continue;
-      }
-
-      throw err;
-    }
-  }
-}
-
-router.post('/:kind/message', upload.single('image'), async (req, res) => {
-  try {
-    const kind = req.params.kind;
-    if (!['trading', 'gestion', 'backtesting'].includes(kind)) {
-      return res.status(400).json({ error: 'Tipo de chat invalido' });
-    }
-    const message = (req.body.message || '').trim();
-    if (!message && !req.file) return res.status(400).json({ error: 'Mensaje vacio' });
-
-    const userContentText = message || (req.file ? '(captura)' : '');
-
-    await query(
-      'INSERT INTO chat_messages (session_id, role, content, chat_kind, image_url) VALUES ($1, $2, $3, $4, $5)',
-      [kind + '_main', 'user', userContentText, kind, req.file ? '[img]' : null]
-    );
-
-    const history = await query(
-      `SELECT role, content FROM chat_messages
-       WHERE chat_kind = $1 AND content IS NOT NULL AND content != ''
-       ORDER BY created_at DESC LIMIT $2`,
-      [kind, HISTORY_LIMIT[kind]]
+      'SELECT role, content FROM chat_messages WHERE chat_kind = $1 AND content IS NOT NULL AND content != $2 ORDER BY created_at DESC LIMIT $3',
+      [kind, '', HISTORY_LIMIT[kind]]
     );
     const orderedHistory = history.rows.reverse();
     const sharedContext = await buildSharedContext(kind);
@@ -233,7 +124,6 @@ router.post('/:kind/message', upload.single('image'), async (req, res) => {
         messages
       };
 
-      // Solo añadimos thinking si esta enabled
       if (THINKING_CONFIG[kind].enabled) {
         apiParams.thinking = {
           type: 'enabled',
@@ -242,7 +132,7 @@ router.post('/:kind/message', upload.single('image'), async (req, res) => {
       }
 
       response = await callClaudeWithRetry(apiParams);
-      console.log(`[${kind}] L${safetyCounter} stop=${response.stop_reason} in=${response.usage?.input_tokens} out=${response.usage?.output_tokens}`);
+      console.log('[' + kind + '] L' + safetyCounter + ' stop=' + response.stop_reason + ' in=' + response.usage?.input_tokens + ' out=' + response.usage?.output_tokens);
 
       if (response.stop_reason !== 'tool_use') break;
 
@@ -259,7 +149,7 @@ router.post('/:kind/message', upload.single('image'), async (req, res) => {
           continue;
         }
         const result = await executeTool(tu.name, tu.input);
-        console.log(`[${kind}] tool ${tu.name}`);
+        console.log('[' + kind + '] tool ' + tu.name);
         accumulatedToolCalls.push({ name: tu.name, input: tu.input, result });
         toolResults.push({ type: 'tool_result', tool_use_id: tu.id, content: JSON.stringify(result) });
         executedSomething = true;
@@ -288,7 +178,7 @@ router.post('/:kind/message', upload.single('image'), async (req, res) => {
     if (err.status === 529) userMsg = 'Servidores Claude sobrecargados. Reintenta.';
     if (err.status === 429 && !err.userMessage) {
       const retryAfter = parseInt(err.headers?.['retry-after']) || 60;
-      userMsg = `Limite. Espera ${retryAfter}s.`;
+      userMsg = 'Limite. Espera ' + retryAfter + 's.';
     }
     if (err.status === 401) userMsg = 'API key invalida.';
     res.status(err.status || 500).json({ error: userMsg });
