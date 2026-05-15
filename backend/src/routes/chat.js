@@ -51,31 +51,58 @@ Estado actual: 35 trades, +9865 USD, WR 53.3%. Asia debil (20%), NY fuerte (75%)
 const PROMPTS_BY_KIND = { trading: PROMPT_TRADING, gestion: PROMPT_GESTION, backtesting: PROMPT_BACKTESTING };
 const TOOLS_BY_KIND = { trading: TOOLS_TRADING, gestion: TOOLS_GESTION, backtesting: TOOLS_BACKTESTING };
 
+/**
+ * Llama a la API de Claude con reintentos automáticos en caso de 529 (overloaded).
+ */
+async function callClaudeWithRetry(params, maxRetries = 3) {
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    try {
+      return await claude.messages.create(params);
+    } catch (err) {
+      const isOverloaded = err.status === 529 || (err.message || '').includes('overloaded');
+      const isLastAttempt = attempt === maxRetries - 1;
+      if (!isOverloaded || isLastAttempt) throw err;
+      const delay = 1000 * Math.pow(2, attempt); // 1s, 2s, 4s
+      console.log(`[Claude] Overloaded, reintentando en ${delay}ms (intento ${attempt + 1}/${maxRetries})...`);
+      await new Promise((r) => setTimeout(r, delay));
+    }
+  }
+}
+
 router.post('/:kind/message', upload.single('image'), async (req, res) => {
   try {
     const kind = req.params.kind;
     if (!['trading', 'gestion', 'backtesting'].includes(kind)) {
       return res.status(400).json({ error: 'Tipo de chat invalido' });
     }
-    const message = req.body.message || '';
+    const message = (req.body.message || '').trim();
     if (!message && !req.file) return res.status(400).json({ error: 'Mensaje vacio' });
+
+    // Asegurar que SIEMPRE haya contenido textual (aunque solo se suba imagen)
+    const userContentText = message || (req.file ? '(captura adjunta sin texto)' : '');
 
     await query(
       'INSERT INTO chat_messages (session_id, role, content, chat_kind, image_url) VALUES ($1, $2, $3, $4, $5)',
-      [kind + '_main', 'user', message, kind, req.file ? '[image attached]' : null]
+      [kind + '_main', 'user', userContentText, kind, req.file ? '[image attached]' : null]
     );
 
-    // History reducido a 15 mensajes para minimizar tokens
+    // History con saneamiento: filtrar mensajes con contenido vacio
     const history = await query(
-      'SELECT role, content FROM chat_messages WHERE chat_kind = $1 ORDER BY created_at DESC LIMIT 15',
+      `SELECT role, content FROM chat_messages
+       WHERE chat_kind = $1 AND content IS NOT NULL AND content != ''
+       ORDER BY created_at DESC LIMIT 15`,
       [kind]
     );
     const orderedHistory = history.rows.reverse();
 
-    // Contexto FILTRADO por tipo de chat
     const sharedContext = await buildSharedContext(kind);
 
-    const messages = orderedHistory.slice(0, -1).map((m) => ({ role: m.role, content: m.content }));
+    // Construir mensajes para Claude (todos menos el ultimo, que reconstruimos abajo)
+    const messages = orderedHistory.slice(0, -1)
+      .filter((m) => m.content && m.content.trim().length > 0)
+      .map((m) => ({ role: m.role, content: m.content }));
+
+    // Ultimo mensaje del usuario (con imagen si aplica)
     const lastUserContent = [];
     if (req.file) {
       lastUserContent.push({
@@ -94,7 +121,7 @@ router.post('/:kind/message', upload.single('image'), async (req, res) => {
 
     while (safetyCounter < 5) {
       safetyCounter++;
-      response = await claude.messages.create({
+      response = await callClaudeWithRetry({
         model: CLAUDE_MODEL,
         max_tokens: 1500,
         system: systemPrompt,
@@ -114,7 +141,8 @@ router.post('/:kind/message', upload.single('image'), async (req, res) => {
       messages.push({ role: 'user', content: toolResults });
     }
 
-    const assistantText = response.content.filter((c) => c.type === 'text').map((c) => c.text).join('\n');
+    const assistantText = response.content.filter((c) => c.type === 'text').map((c) => c.text).join('\n')
+      || '(Respuesta vacia - reintenta)';
 
     await query(
       'INSERT INTO chat_messages (session_id, role, content, chat_kind, tool_calls) VALUES ($1, $2, $3, $4, $5)',
@@ -124,7 +152,12 @@ router.post('/:kind/message', upload.single('image'), async (req, res) => {
     res.json({ message: assistantText, tool_calls: accumulatedToolCalls });
   } catch (err) {
     console.error('Chat ' + req.params.kind + ' error:', err);
-    res.status(500).json({ error: err.message });
+    // Mensajes de error más claros para el usuario
+    let userMsg = err.message;
+    if (err.status === 529) userMsg = 'Servidores de Claude sobrecargados. Reintenta en 1 minuto.';
+    if (err.status === 429) userMsg = 'Límite de uso alcanzado. Espera 1 minuto.';
+    if (err.status === 401) userMsg = 'API key inválida. Revisa ANTHROPIC_API_KEY en Railway.';
+    res.status(err.status || 500).json({ error: userMsg });
   }
 });
 
