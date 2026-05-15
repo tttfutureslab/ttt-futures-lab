@@ -1,22 +1,21 @@
 import { useEffect, useState } from 'react';
 import './Dashboard.css';
+import AccountDetailDrawer from '../components/AccountDetailDrawer';
 
 const API = '/api';
 
 const fmt = (n, opts = {}) => {
   if (n === null || n === undefined || isNaN(n)) return '—';
   return Number(n).toLocaleString('en-US', {
-    style: 'currency',
-    currency: 'USD',
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-    ...opts
+    style: 'currency', currency: 'USD',
+    minimumFractionDigits: 0, maximumFractionDigits: 0, ...opts
   });
 };
 
 export default function Dashboard() {
   const [data, setData] = useState({ accounts: [], evolution: {} });
   const [loading, setLoading] = useState(true);
+  const [selectedAccount, setSelectedAccount] = useState(null);
 
   async function load() {
     setLoading(true);
@@ -24,15 +23,13 @@ export default function Dashboard() {
       const res = await fetch(`${API}/dashboard`, { credentials: 'include' });
       const json = await res.json();
       setData(json);
-    } catch (e) {
-      console.error(e);
-    }
+    } catch (e) { console.error(e); }
     setLoading(false);
   }
 
   useEffect(() => {
     load();
-    const interval = setInterval(load, 30000); // refrescar cada 30s
+    const interval = setInterval(load, 30000);
     return () => clearInterval(interval);
   }, []);
 
@@ -55,7 +52,6 @@ export default function Dashboard() {
     );
   }
 
-  // Totales agregados
   const totals = data.accounts.reduce((acc, a) => {
     const last = a.last_snapshot;
     if (last) {
@@ -68,7 +64,6 @@ export default function Dashboard() {
 
   return (
     <div className="dashboard">
-      {/* Totales globales */}
       <div className="dash-totals">
         <div className="total-card">
           <div className="total-label">BALANCE TOTAL</div>
@@ -88,16 +83,22 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Grid de tarjetas por cuenta */}
       <div className="dash-grid">
         {data.accounts.map((acc) => (
-          <AccountCard key={acc.id} account={acc} evolution={data.evolution[acc.id] || []} />
+          <AccountCard
+            key={acc.id}
+            account={acc}
+            evolution={data.evolution[acc.id] || []}
+            onClick={() => setSelectedAccount(acc.id)}
+          />
         ))}
       </div>
 
-      {/* Tabla compacta */}
       <div className="panel" style={{ marginTop: 24 }}>
         <h3 className="panel-title">📋 RESUMEN DE CUENTAS</h3>
+        <p style={{ fontSize: 11, color: 'var(--silver-dim)', marginTop: -8, marginBottom: 12 }}>
+          Click en una fila para ver detalles completos
+        </p>
         <div style={{ overflowX: 'auto' }}>
           <table className="dash-table">
             <thead>
@@ -116,7 +117,7 @@ export default function Dashboard() {
               {data.accounts.map((acc) => {
                 const last = acc.last_snapshot;
                 return (
-                  <tr key={acc.id}>
+                  <tr key={acc.id} onClick={() => setSelectedAccount(acc.id)} style={{ cursor: 'pointer' }}>
                     <td><b>{acc.account_label}</b></td>
                     <td className="dim">{acc.firm_slug}</td>
                     <td className="mono-num right">{fmt(last?.balance)}</td>
@@ -140,16 +141,22 @@ export default function Dashboard() {
           </table>
         </div>
       </div>
+
+      <AccountDetailDrawer
+        accountId={selectedAccount}
+        onClose={() => setSelectedAccount(null)}
+        onUpdate={load}
+      />
     </div>
   );
 }
 
-function AccountCard({ account, evolution }) {
+function AccountCard({ account, evolution, onClick }) {
   const last = account.last_snapshot;
   const hasAlerts = account.alerts.length > 0;
   const criticalAlert = account.alerts.some((a) => a.level === 'critical');
   return (
-    <div className={`acc-card ${criticalAlert ? 'critical' : hasAlerts ? 'warning' : ''}`}>
+    <div className={`acc-card ${criticalAlert ? 'critical' : hasAlerts ? 'warning' : ''}`} onClick={onClick} style={{ cursor: 'pointer' }}>
       <div className="acc-head">
         <div>
           <div className="acc-label">{account.account_label}</div>
@@ -166,7 +173,6 @@ function AccountCard({ account, evolution }) {
         <Metric label="DD actual" value={fmt(last?.trailing_dd_now)} />
       </div>
 
-      {/* Mini gráfico de evolución */}
       {evolution.length >= 2 && <Sparkline data={evolution} />}
 
       {account.alerts.length > 0 && (
@@ -176,6 +182,10 @@ function AccountCard({ account, evolution }) {
           ))}
         </div>
       )}
+
+      <div style={{ fontSize: 10, color: 'var(--silver-dim)', textAlign: 'center', marginTop: 4, letterSpacing: '0.15em' }}>
+        CLICK PARA DETALLES →
+      </div>
     </div>
   );
 }
@@ -194,22 +204,14 @@ function Sparkline({ data }) {
   const min = Math.min(...values);
   const max = Math.max(...values);
   const range = max - min || 1;
-  const points = values
-    .map((v, i) => `${(i / (values.length - 1)) * 100},${100 - ((v - min) / range) * 100}`)
-    .join(' ');
+  const points = values.map((v, i) => `${(i / (values.length - 1)) * 100},${100 - ((v - min) / range) * 100}`).join(' ');
   const lastVal = values[values.length - 1];
   const firstVal = values[0];
   const trending = lastVal >= firstVal ? 'pos' : 'neg';
   return (
     <div className="acc-spark">
       <svg viewBox="0 0 100 100" preserveAspectRatio="none">
-        <polyline
-          points={points}
-          fill="none"
-          stroke={trending === 'pos' ? '#6cd97e' : '#f76b6b'}
-          strokeWidth="2"
-          vectorEffect="non-scaling-stroke"
-        />
+        <polyline points={points} fill="none" stroke={trending === 'pos' ? '#6cd97e' : '#f76b6b'} strokeWidth="2" vectorEffect="non-scaling-stroke" />
       </svg>
     </div>
   );

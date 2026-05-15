@@ -5,6 +5,7 @@ import { fileURLToPath } from 'url';
 import 'dotenv/config';
 
 import accountsRouter from './routes/accounts.js';
+import accountDetailRouter from './routes/accountDetail.js';
 import rulesRouter from './routes/rules.js';
 import chatRouter from './routes/chat.js';
 import authRouter from './routes/auth.js';
@@ -23,6 +24,7 @@ app.use('/api/auth', authRouter);
 app.use(requireAuth);
 
 app.use('/api/accounts', accountsRouter);
+app.use('/api/account-detail', accountDetailRouter);
 app.use('/api/rules', rulesRouter);
 app.use('/api/chat', chatRouter);
 app.use('/api/dashboard', dashboardRouter);
