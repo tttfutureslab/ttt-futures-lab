@@ -7,7 +7,8 @@ const NAV = [
   { to: '/',            label: '📊 DASHBOARD' },
   { to: '/trading',     label: '📈 TRADING' },
   { to: '/gestion',     label: '💼 GESTIÓN' },
-  { to: '/backtesting', label: '📊 BACKTEST' },
+  { to: '/backtesting', label: '🔬 BACKTEST' },
+  { to: '/sessions',    label: '🕐 SESIONES' },
   { to: '/rules',       label: '📚 NORMAS' }
 ];
 

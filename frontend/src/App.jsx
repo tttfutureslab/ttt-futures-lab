@@ -7,6 +7,7 @@ import Dashboard from './pages/Dashboard';
 import ChatTrading from './pages/ChatTrading';
 import ChatGestion from './pages/ChatGestion';
 import ChatBacktesting from './pages/ChatBacktesting';
+import Sessions from './pages/Sessions';
 import Rules from './pages/Rules';
 import { getAuthStatus } from './lib/api';
 
@@ -58,6 +59,7 @@ export default function App() {
             <Route path="/trading"     element={<ChatTrading />} />
             <Route path="/gestion"     element={<ChatGestion />} />
             <Route path="/backtesting" element={<ChatBacktesting />} />
+            <Route path="/sessions"    element={<Sessions />} />
             <Route path="/rules"       element={<Rules />} />
           </Routes>
         </main>
