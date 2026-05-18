@@ -209,3 +209,18 @@
 @media (max-width: 480px) {
   .tr-form-grid { grid-template-columns: 1fr; }
 }
+
+/* Override: grid de 3 columnas para acomodar 6 campos en 2 filas */
+.tr-form-grid {
+  grid-template-columns: repeat(3, 1fr) !important;
+}
+@media (max-width: 768px) {
+  .tr-form-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+}
+@media (max-width: 480px) {
+  .tr-form-grid {
+    grid-template-columns: 1fr !important;
+  }
+}

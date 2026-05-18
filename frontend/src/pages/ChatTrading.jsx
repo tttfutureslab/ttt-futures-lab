@@ -8,6 +8,8 @@ const fmt = (n) => (n === null || n === undefined || isNaN(n)) ? '—'
   : Number(n).toLocaleString('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 const DIRECTIONS = ['long', 'short'];
+const SESSIONS = ['Asia', 'London', 'NY AM', 'NY PM'];
+const QUARTERS = ['Q1', 'Q2', 'Q3', 'Q4'];
 const RESULTS = ['TP', 'SL', 'BE', 'partial'];
 
 export default function ChatTrading() {
@@ -22,6 +24,8 @@ export default function ChatTrading() {
     direction: 'long',
     result: 'TP',
     pnl_usd: '',
+    session: '',
+    quarter: '',
     reason: ''
   });
 
@@ -69,6 +73,8 @@ export default function ChatTrading() {
     e?.preventDefault?.();
     if (!form.account_id) { alert('Selecciona una cuenta'); return; }
     if (form.pnl_usd === '' || isNaN(Number(form.pnl_usd))) { alert('PnL inválido'); return; }
+    if (!form.session) { alert('Selecciona la sesión (Daily Q)'); return; }
+    if (!form.quarter) { alert('Selecciona el cuarto (90-min Q)'); return; }
 
     setSaving(true);
     try {
@@ -79,6 +85,8 @@ export default function ChatTrading() {
         contracts: 1,
         result: form.result,
         pnl_usd: Number(form.pnl_usd),
+        session: form.session,
+        quarter: form.quarter,
         reason: form.reason || null,
         trade_at: new Date().toISOString()
       };
@@ -162,6 +170,22 @@ export default function ChatTrading() {
                   {a.account_label} {a.phase ? `(${a.phase})` : ''}
                 </option>
               ))}
+            </select>
+          </div>
+
+          <div className="tr-field">
+            <label>DAILY Q (sesión) *</label>
+            <select value={form.session} onChange={(e) => setForm({ ...form, session: e.target.value })} required>
+              <option value="">— Elige sesión —</option>
+              {SESSIONS.map((s) => <option key={s} value={s}>{s}</option>)}
+            </select>
+          </div>
+
+          <div className="tr-field">
+            <label>90-MIN Q (cuarto) *</label>
+            <select value={form.quarter} onChange={(e) => setForm({ ...form, quarter: e.target.value })} required>
+              <option value="">— Elige cuarto —</option>
+              {QUARTERS.map((q) => <option key={q} value={q}>{q}</option>)}
             </select>
           </div>
 
