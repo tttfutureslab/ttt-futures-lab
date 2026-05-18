@@ -25,6 +25,12 @@ const THINKING_CONFIG = {
   backtesting: { enabled: false, budget: 0 }
 };
 
+const MODEL_BY_KIND = {
+  trading:     'claude-haiku-4-5',
+  gestion:     'claude-haiku-4-5',
+  backtesting: 'claude-haiku-4-5'
+};
+
 const HISTORY_LIMIT = { trading: 10, gestion: 10, backtesting: 8 };
 const MAX_TOKENS = { trading: 1500, gestion: 1500, backtesting: 1500 };
 
