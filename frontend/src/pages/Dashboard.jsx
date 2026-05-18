@@ -40,9 +40,16 @@ export default function Dashboard() {
     const current = getCurrentTrader();
     if (current) setViewMode(current);
     load();
+  }, []);
+
+  useEffect(() => {
+    // Auto-refresh cada 30s, PERO solo si NO hay modal abierto
+    const hasModal = selectedAccount || showCreateAccount;
+    if (hasModal) return; // pausa el refresh
+
     const interval = setInterval(load, 30000);
     return () => clearInterval(interval);
-  }, []);
+  }, [selectedAccount, showCreateAccount]);
 
   if (loading) {
     return (
