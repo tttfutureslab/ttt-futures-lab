@@ -29,22 +29,35 @@ router.post('/insights', async (req, res) => {
       return res.json({ insights: 'Todavia no hay trades reales registrados. Ve al Chat Trading y empieza a registrar operaciones.' });
     }
 
-    const prompt = `Analiza estas estadisticas de trading real (NQ futures, estrategia v18, R:R 3:1).
-Da 3-5 insights muy concretos y accionables. Identifica:
-- Sesion mas rentable y por que
-- Sesion mas debil y como mejorarla o evitarla
-- Patron sesion-cuarto que destaque
+    const obsText = (stats.observations || []).map(function(o) {
+      const tag = '[' + (o.session || '?') + ' ' + (o.quarter || '?') + ']';
+      const pnl = (Number(o.pnl_usd) >= 0 ? '+' : '') + o.pnl_usd;
+      return tag + ' ' + o.direction + ' ' + o.result + ' ' + pnl + ': "' + o.reason + '"';
+    }).join('\n');
+
+    const prompt = `Analiza estos datos de trading real de futuros NQ.
+Tienes estadisticas cuantitativas Y observaciones cualitativas (notas que el trader escribio en cada trade).
+
+Da analisis profesional en bullet points. Identifica:
+- Sesion mas rentable Y porque (usa observaciones)
+- Sesion mas debil Y patron de errores recurrentes
+- Patron sesion-cuarto destacable
 - Dia de la semana mas/menos productivo
-- Recomendaciones concretas para mejorar resultados
+- Patrones psicologicos detectados en las observaciones (FOMO, revenge trading, sobreoperar, dudas, falta de paciencia)
+- Setups o contextos repetidos en wins vs losses
+- Recomendaciones concretas
 
-Responde en formato bullet points en espanol, directo y tecnico. Maximo 250 palabras.
+Maximo 400 palabras, espanol tecnico pero claro.
 
-DATOS:
-${JSON.stringify(stats, null, 2)}`;
+ESTADISTICAS:
+${JSON.stringify({ totals: stats.totals, by_session: stats.by_session, by_session_quarter: stats.by_session_quarter, by_weekday: stats.by_weekday }, null, 2)}
+
+OBSERVACIONES DEL TRADER (${(stats.observations || []).length} trades con notas):
+${obsText || '(sin observaciones registradas)'}`;
 
     const response = await claude.messages.create({
       model: CLAUDE_MODEL,
-      max_tokens: 800,
+      max_tokens: 1200,
       messages: [{ role: 'user', content: prompt }]
     });
 
@@ -112,11 +125,25 @@ async function computeStats() {
     FROM trades
   `);
 
+  // Observaciones de cada trade para analisis cualitativo
+  const observations = await query(`
+    SELECT
+      tr.session, tr.quarter, tr.direction, tr.result,
+      tr.pnl_usd, tr.reason, tr.trade_at,
+      a.account_label
+    FROM trades tr
+    LEFT JOIN accounts a ON a.id = tr.account_id
+    WHERE tr.reason IS NOT NULL AND tr.reason != ''
+    ORDER BY tr.trade_at DESC
+    LIMIT 80
+  `);
+
   return {
     totals: totals.rows[0],
     by_session: bySession.rows,
     by_session_quarter: bySessionQuarter.rows,
-    by_weekday: byWeekday.rows
+    by_weekday: byWeekday.rows,
+    observations: observations.rows
   };
 }
 
