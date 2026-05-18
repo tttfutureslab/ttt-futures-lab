@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react';
 import './Dashboard.css';
 import AccountDetailDrawer from '../components/AccountDetailDrawer';
 import AccountProgress from '../components/AccountProgress';
+import { CreateAccountModal } from '../components/AdminForms';
+import { getCurrentTrader as _gct } from '../lib/traderContext';
 import { getCurrentTrader } from '../lib/traderContext';
 
 const API = '/api';
@@ -18,6 +20,7 @@ export default function Dashboard() {
   const [selectedAccount, setSelectedAccount] = useState(null);
   const [viewMode, setViewMode] = useState('all');
   const [showArchived, setShowArchived] = useState(false);
+  const [showCreateAccount, setShowCreateAccount] = useState(false);
 
   async function load() {
     setLoading(true);
@@ -136,6 +139,18 @@ export default function Dashboard() {
         onClose={() => setSelectedAccount(null)}
         onUpdate={load}
       />
+
+      <button className="btn-new-account-fab" onClick={() => setShowCreateAccount(true)} title="Nueva cuenta">
+        +
+      </button>
+
+      {showCreateAccount && (
+        <CreateAccountModal
+          defaultTrader={viewMode !== 'all' ? viewMode : 'adri'}
+          onClose={() => setShowCreateAccount(false)}
+          onSuccess={() => { load(); }}
+        />
+      )}
     </div>
   );
 }

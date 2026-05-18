@@ -280,3 +280,147 @@
   .edit-grid .span-2 { grid-column: span 1; }
   .donut-wrap { flex-direction: column; }
 }
+
+/* ─── Section headers con botones ─── */
+.section-header-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+.section-header-row .section-title {
+  margin: 0;
+}
+
+/* ─── Botones de añadir (+ Trade, + Snapshot, + Payout) ─── */
+.btn-add {
+  background: rgba(255,255,255,0.04);
+  border: 1px solid var(--silver-line);
+  color: var(--silver);
+  font-family: inherit;
+  font-size: 10px;
+  letter-spacing: 0.15em;
+  font-weight: 700;
+  padding: 6px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-transform: uppercase;
+}
+.btn-add:hover {
+  background: rgba(255,255,255,0.08);
+  border-color: var(--silver);
+  transform: translateY(-1px);
+}
+.btn-add-trade:hover { border-color: #6cd97e; color: #6cd97e; }
+.btn-add-snapshot:hover { border-color: #a3c8ff; color: #a3c8ff; }
+.btn-add-payout:hover { border-color: #f7c66b; color: #f7c66b; }
+
+/* ─── Botón editar cuenta en header del drawer ─── */
+.drawer-quick-actions {
+  padding: 0 0 16px 0;
+  border-bottom: 1px solid var(--silver-line);
+  margin-bottom: 16px;
+  display: flex;
+  gap: 8px;
+}
+.btn-edit-header {
+  background: rgba(255,255,255,0.04);
+  border: 1px solid var(--silver-line);
+  color: var(--silver);
+  padding: 8px 16px;
+  border-radius: 6px;
+  font-family: inherit;
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+.btn-edit-header:hover {
+  background: rgba(255,255,255,0.08);
+  border-color: var(--silver);
+}
+
+/* ─── Botones de acción inline (borrar trade/snapshot/payout) ─── */
+.td-actions {
+  text-align: center;
+  width: 36px;
+}
+.btn-icon {
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--silver-dim);
+  font-size: 13px;
+  width: 26px;
+  height: 26px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  padding: 0;
+  line-height: 1;
+}
+.btn-icon:hover {
+  background: rgba(247,107,107,0.1);
+  border-color: rgba(247,107,107,0.3);
+  color: #f76b6b;
+}
+
+/* ─── Sección PAYOUTS ─── */
+.section-payouts {
+  margin-top: 8px;
+}
+.payouts-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.payout-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr 36px;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: rgba(108,217,126,0.04);
+  border: 1px solid rgba(108,217,126,0.15);
+  border-radius: 6px;
+  font-size: 12px;
+}
+.payout-date {
+  color: var(--silver);
+  letter-spacing: 0.05em;
+}
+.payout-method {
+  color: var(--silver-dim);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+}
+
+/* ─── Botón "+ Nueva cuenta" flotante en Dashboard ─── */
+.btn-new-account-fab {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #6cd97e, #4ab85f);
+  color: #000;
+  border: none;
+  font-size: 26px;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 8px 24px rgba(108,217,126,0.4);
+  z-index: 50;
+  transition: all 0.2s ease;
+}
+.btn-new-account-fab:hover {
+  transform: scale(1.08);
+  box-shadow: 0 12px 32px rgba(108,217,126,0.6);
+}
+
+@media (max-width: 480px) {
+  .payout-row { grid-template-columns: 1fr 1fr 36px; font-size: 11px; }
+  .payout-method { display: none; }
+}
