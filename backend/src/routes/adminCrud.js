@@ -265,19 +265,7 @@ router.get('/trades/recent', async (req, res) => {
     const params = [];
     if (traderSlug) {
       params.push(traderSlug);
-      sql += ' AND t.slug = 
-    }
-    sql += ' ORDER BY tr.trade_at DESC LIMIT ' + limit;
-
-    const r = await query(sql, params);
-    res.json({ trades: r.rows, count: r.rows.length });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-export default router;
- + params.length;
+      sql += ' AND t.slug = $' + params.length;
     }
     sql += ' ORDER BY tr.trade_at DESC LIMIT ' + limit;
 
