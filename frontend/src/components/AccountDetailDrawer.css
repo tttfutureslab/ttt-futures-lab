@@ -424,3 +424,15 @@
   .payout-row { grid-template-columns: 1fr 1fr 36px; font-size: 11px; }
   .payout-method { display: none; }
 }
+
+.btn-edit-trade:hover {
+  background: rgba(108,217,126,0.1);
+  border-color: rgba(108,217,126,0.4);
+  color: #6cd97e;
+}
+.td-actions {
+  width: 64px;
+  display: flex;
+  gap: 4px;
+  justify-content: center;
+}

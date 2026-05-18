@@ -1,6 +1,7 @@
 import { useEffect, useState, useRef } from 'react';
 import AccountProgress from './AccountProgress';
 import {
+  EditTradeModal,
   EditAccountModal,
   AddTradeModal,
   AddSnapshotModal,
@@ -20,6 +21,7 @@ export default function AccountDetailDrawer({ accountId, onClose, onUpdate }) {
   const [showAddTrade, setShowAddTrade] = useState(false);
   const [showAddSnapshot, setShowAddSnapshot] = useState(false);
   const [showAddPayout, setShowAddPayout] = useState(false);
+  const [editingTrade, setEditingTrade] = useState(null);
   const [payouts, setPayouts] = useState([]);
 
   async function load() {
@@ -268,6 +270,7 @@ export default function AccountDetailDrawer({ accountId, onClose, onUpdate }) {
                           <td><span className={`result-badge ${t.result}`}>{t.result}</span></td>
                           <td className={`mono-num right ${t.pnl_usd >= 0 ? 'value-pos' : 'value-neg'}`}>{fmt(t.pnl_usd)}</td>
                       <td className="td-actions">
+                        <button className="btn-icon btn-edit-trade" onClick={() => setEditingTrade(t)} title="Editar">✎</button>
                         <button className="btn-icon btn-delete-trade" onClick={() => deleteTrade(t.id)} title="Borrar">🗑</button>
                       </td>
                     </tr>
@@ -319,6 +322,13 @@ export default function AccountDetailDrawer({ accountId, onClose, onUpdate }) {
           </div>
           </div>
 
+      {editingTrade && (
+        <EditTradeModal
+          trade={editingTrade}
+          onClose={() => setEditingTrade(null)}
+          onSuccess={() => { load(); onUpdate?.(); }}
+        />
+      )}
       {showEditAccount && (
         <EditAccountModal
           account={{ ...data.account, id: accountId, trader_slug: data.account.trader_slug }}
