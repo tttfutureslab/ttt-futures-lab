@@ -69,6 +69,21 @@ export default function AccountDetailDrawer({ accountId, onClose, onUpdate }) {
 
   if (!accountId) return null;
 
+  async function deleteTrade(tradeId) {
+    if (!confirm('¿Borrar este trade definitivamente?')) return;
+    try {
+      const r = await fetch(`${API}/admin/trades/${tradeId}`, {
+        method: 'DELETE',
+        credentials: 'include'
+      });
+      if (!r.ok) throw new Error('Error borrando');
+      await load();
+      onUpdate?.();
+    } catch (e) {
+      alert('Error: ' + e.message);
+    }
+  }
+
   return (
     <>
       <div className="drawer-overlay" onClick={onClose} />
@@ -239,7 +254,7 @@ export default function AccountDetailDrawer({ accountId, onClose, onUpdate }) {
                           <td>{t.quarter || '—'}</td>
                           <td><span className={`result-badge ${t.result}`}>{t.result}</span></td>
                           <td className={`mono-num right ${t.pnl_usd >= 0 ? 'value-pos' : 'value-neg'}`}>{fmt(t.pnl_usd)}</td>
-                          <td style={{ textAlign: "center", width: 32 }}><button onClick={() => setEditingTrade(t)} title="Editar" style={{ background: "transparent", border: "1px solid rgba(255,255,255,0.15)", color: "rgba(255,255,255,0.6)", width: 26, height: 26, borderRadius: 4, cursor: "pointer", fontFamily: "inherit" }}>✎</button></td>
+                          <td style={{ textAlign: "center", width: 70 }}><button onClick={() => setEditingTrade(t)} title="Editar" style={{ background: "transparent", border: "1px solid rgba(255,255,255,0.15)", color: "rgba(255,255,255,0.6)", width: 26, height: 26, borderRadius: 4, cursor: "pointer", fontFamily: "inherit" }}>✎</button><button onClick={() => deleteTrade(t.id)} title="Borrar" style={{ background: "transparent", border: "1px solid rgba(247,107,107,0.25)", color: "rgba(247,107,107,0.7)", width: 26, height: 26, borderRadius: 4, cursor: "pointer", fontFamily: "inherit", marginLeft: 4 }}>🗑</button></td>
                         </tr>
                       ))}
                     </tbody>
