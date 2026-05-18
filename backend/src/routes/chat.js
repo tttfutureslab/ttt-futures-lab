@@ -20,13 +20,13 @@ const PROMPTS_BY_KIND = {
 };
 
 const THINKING_CONFIG = {
-  trading:     { enabled: true,  budget: 2000 },
-  gestion:     { enabled: true,  budget: 1500 },
+  trading:     { enabled: false, budget: 0 },
+  gestion:     { enabled: false, budget: 0 },
   backtesting: { enabled: false, budget: 0 }
 };
 
-const HISTORY_LIMIT = { trading: 25, gestion: 25, backtesting: 8 };
-const MAX_TOKENS = { trading: 6000, gestion: 4500, backtesting: 1500 };
+const HISTORY_LIMIT = { trading: 10, gestion: 10, backtesting: 8 };
+const MAX_TOKENS = { trading: 1500, gestion: 1500, backtesting: 1500 };
 
 async function callClaudeWithRetry(params, maxRetries = 3) {
   for (let attempt = 0; attempt < maxRetries; attempt++) {
@@ -137,7 +137,7 @@ router.post('/:kind/message', upload.single('image'), async (req, res) => {
       safetyCounter++;
 
       const apiParams = {
-        model: CLAUDE_MODEL,
+        model: MODEL_BY_KIND[kind] || CLAUDE_MODEL,
         max_tokens: MAX_TOKENS[kind],
         system: systemPrompt,
         tools: ALL_TOOLS,
