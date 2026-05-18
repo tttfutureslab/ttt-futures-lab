@@ -1,6 +1,7 @@
 import { useEffect, useState, useRef } from 'react';
 import AccountProgress from './AccountProgress';
 import EditTradeModal from './EditTradeModal';
+import { AddSnapshotModal } from './AdminForms';
 import './AccountDetailDrawer.css';
 
 const API = '/api';
@@ -12,6 +13,7 @@ export default function AccountDetailDrawer({ accountId, onClose, onUpdate }) {
   const [editing, setEditing] = useState(false);
   const [editForm, setEditForm] = useState({});
   const [editingTrade, setEditingTrade] = useState(null);
+  const [showAdjustBalance, setShowAdjustBalance] = useState(false);
 
   async function load() {
     setLoading(true);
@@ -117,7 +119,25 @@ export default function AccountDetailDrawer({ accountId, onClose, onUpdate }) {
 
             {/* Métricas clave */}
             <div className="drawer-section">
-              <h3 className="section-title">📊 MÉTRICAS</h3>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                <h3 className="section-title">📊 MÉTRICAS</h3>
+                <button
+                  onClick={() => setShowAdjustBalance(true)}
+                  title="Ajustar saldo manualmente"
+                  style={{
+                    background: 'rgba(255,255,255,0.04)',
+                    border: '1px solid rgba(255,255,255,0.15)',
+                    color: 'rgba(255,255,255,0.7)',
+                    padding: '6px 12px',
+                    borderRadius: 6,
+                    fontFamily: 'inherit',
+                    fontSize: 10,
+                    letterSpacing: '0.15em',
+                    fontWeight: 700,
+                    cursor: 'pointer'
+                  }}
+                >✎ AJUSTAR SALDO</button>
+              </div>
               <div className="metrics-grid">
                 <Metric label="Balance" value={fmt(data.last_snapshot?.balance)} />
                 <Metric label="PnL hoy" value={fmt(data.last_snapshot?.pnl_today)} className={data.last_snapshot?.pnl_today >= 0 ? 'value-pos' : 'value-neg'} />
@@ -244,6 +264,13 @@ export default function AccountDetailDrawer({ accountId, onClose, onUpdate }) {
           </div>
         )}
       </div>
+      {showAdjustBalance && (
+        <AddSnapshotModal
+          accountId={accountId}
+          onClose={() => setShowAdjustBalance(false)}
+          onSuccess={() => { load(); onUpdate?.(); }}
+        />
+      )}
       {editingTrade && (
         <EditTradeModal
           trade={editingTrade}
