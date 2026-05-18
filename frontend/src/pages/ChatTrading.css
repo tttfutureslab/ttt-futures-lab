@@ -224,3 +224,14 @@
     grid-template-columns: 1fr !important;
   }
 }
+
+.tr-empty-cell {
+  color: var(--silver-dim);
+  opacity: 0.5;
+  font-style: italic;
+}
+.tr-session-cell, .tr-quarter-cell {
+  font-size: 11px;
+  letter-spacing: 0.05em;
+  color: var(--silver-dim);
+}

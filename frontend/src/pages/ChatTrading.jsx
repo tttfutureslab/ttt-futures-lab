@@ -245,6 +245,8 @@ export default function ChatTrading() {
                 <tr>
                   <th>Fecha</th>
                   <th>Cuenta</th>
+                  <th>Sesión</th>
+                  <th>Q</th>
                   <th>Dir</th>
                   <th>Result</th>
                   <th className="right">PnL</th>
@@ -278,6 +280,8 @@ function TradeRow({ trade, isEditing, onEdit, onCancel, onSave, onDelete }) {
     direction: trade.direction || 'long',
     result: trade.result || 'TP',
     pnl_usd: trade.pnl_usd || 0,
+    session: trade.session || '',
+    quarter: trade.quarter || '',
     reason: trade.reason || ''
   });
 
@@ -286,6 +290,8 @@ function TradeRow({ trade, isEditing, onEdit, onCancel, onSave, onDelete }) {
       direction: trade.direction || 'long',
       result: trade.result || 'TP',
       pnl_usd: trade.pnl_usd || 0,
+      session: trade.session || '',
+      quarter: trade.quarter || '',
       reason: trade.reason || ''
     });
   }, [trade.id]);
@@ -295,6 +301,18 @@ function TradeRow({ trade, isEditing, onEdit, onCancel, onSave, onDelete }) {
       <tr className="tr-editing">
         <td>{new Date(trade.trade_at).toLocaleString().slice(0, 16)}</td>
         <td>{trade.account_label}</td>
+        <td>
+          <select value={editForm.session} onChange={(e) => setEditForm({ ...editForm, session: e.target.value })}>
+            <option value="">—</option>
+            {SESSIONS.map((s) => <option key={s} value={s}>{s}</option>)}
+          </select>
+        </td>
+        <td>
+          <select value={editForm.quarter} onChange={(e) => setEditForm({ ...editForm, quarter: e.target.value })}>
+            <option value="">—</option>
+            {QUARTERS.map((q) => <option key={q} value={q}>{q}</option>)}
+          </select>
+        </td>
         <td>
           <select value={editForm.direction} onChange={(e) => setEditForm({ ...editForm, direction: e.target.value })}>
             {DIRECTIONS.map((d) => <option key={d} value={d}>{d}</option>)}
@@ -334,6 +352,8 @@ function TradeRow({ trade, isEditing, onEdit, onCancel, onSave, onDelete }) {
     <tr>
       <td>{new Date(trade.trade_at).toLocaleString().slice(0, 16)}</td>
       <td>{trade.account_label}</td>
+      <td className="tr-session-cell">{trade.session || <span className="tr-empty-cell">—</span>}</td>
+      <td className="tr-quarter-cell">{trade.quarter || <span className="tr-empty-cell">—</span>}</td>
       <td><span className={`tr-dir tr-dir-${trade.direction}`}>{trade.direction}</span></td>
       <td><span className={`tr-result tr-result-${trade.result}`}>{trade.result}</span></td>
       <td className={`right tr-pnl-cell ${Number(trade.pnl_usd) >= 0 ? 'pos' : 'neg'}`}>{fmt(trade.pnl_usd)}</td>
