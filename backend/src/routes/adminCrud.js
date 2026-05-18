@@ -241,4 +241,39 @@ router.get('/accounts/:id/payouts', async (req, res) => {
   }
 });
 
+
+// GET /admin/trades/recent - Lista trades recientes con filtro por trader
+router.get('/trades/recent', async (req, res) => {
+  try {
+    const limit = Math.min(parseInt(req.query.limit) || 50, 200);
+    const traderSlug = req.query.trader || null;
+
+    let sql = `
+      SELECT
+        tr.id, tr.account_id, tr.asset, tr.direction, tr.contracts,
+        tr.entry_price, tr.exit_price, tr.result, tr.pnl_usd,
+        tr.session, tr.quarter, tr.ict_setup, tr.reason, tr.trade_at,
+        a.account_label, a.phase, a.account_type_name,
+        pf.slug AS firm_slug,
+        t.slug AS trader_slug, t.display_name AS trader_name
+      FROM trades tr
+      LEFT JOIN accounts a ON a.id = tr.account_id
+      LEFT JOIN prop_firms pf ON pf.id = a.prop_firm_id
+      LEFT JOIN traders t ON t.id = COALESCE(tr.trader_id, a.trader_id)
+      WHERE 1=1
+    `;
+    const params = [];
+    if (traderSlug) {
+      params.push(traderSlug);
+      sql += ' AND t.slug =  + params.length;
+    }
+    sql += ' ORDER BY tr.trade_at DESC LIMIT ' + limit;
+
+    const r = await query(sql, params);
+    res.json({ trades: r.rows, count: r.rows.length });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 export default router;
