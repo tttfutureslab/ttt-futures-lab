@@ -5,7 +5,6 @@ const router = Router();
 
 router.get('/', async (req, res) => {
   try {
-    // TODAS las cuentas con last_snapshot pero pnl_today RECALCULADO desde trades del día
     const accounts = await query(`
       SELECT
         a.id, a.account_label, a.size_usd, a.status, a.account_type_name, a.phase,
@@ -16,25 +15,32 @@ router.get('/', async (req, res) => {
         COALESCE(t.slug, 'adri') AS trader_slug,
         COALESCE(t.display_name, 'ADRI') AS trader_name,
         COALESCE(t.color, '#6cd97e') AS trader_color,
-        -- last_snapshot pero con pnl_today reemplazado por la suma real de trades del día
+
+        -- Sumas reales de trades y payouts
+        COALESCE((SELECT SUM(pnl_usd) FROM trades WHERE account_id = a.id), 0)::numeric(12,2) AS trades_total,
+        COALESCE((SELECT SUM(pnl_usd) FROM trades WHERE account_id = a.id AND trade_at::date = CURRENT_DATE), 0)::numeric(12,2) AS trades_today,
+        COALESCE((SELECT SUM(amount_usd) FROM payouts WHERE account_id = a.id), 0)::numeric(12,2) AS total_payouts,
+
+        -- Ultimo snapshot manual (para overrides manuales si existen)
         (SELECT row_to_json(s) FROM (
-          SELECT
-            balance,
-            equity,
-            COALESCE(
-              (SELECT SUM(pnl_usd) FROM trades WHERE account_id = a.id AND trade_at::date = CURRENT_DATE),
-              0
-            )::numeric(12,2) AS pnl_today,
-            pnl_total,
-            trailing_dd_now,
-            best_day_pnl,
-            trading_days,
-            snapshot_at
+          SELECT balance AS manual_balance, snapshot_at
           FROM snapshots WHERE account_id = a.id
           ORDER BY snapshot_at DESC LIMIT 1
-        ) s) AS last_snapshot,
-        -- Total payouts cobrados
-        COALESCE((SELECT SUM(amount_usd) FROM payouts WHERE account_id = a.id), 0)::numeric(12,2) AS total_payouts
+        ) s) AS last_manual_snapshot,
+
+        -- Best day (max PnL diario de los trades)
+        COALESCE((
+          SELECT MAX(daily_pnl) FROM (
+            SELECT SUM(pnl_usd) AS daily_pnl FROM trades
+            WHERE account_id = a.id GROUP BY trade_at::date
+          ) d
+        ), 0)::numeric(12,2) AS best_day_pnl,
+
+        -- Dias unicos operados
+        COALESCE((
+          SELECT COUNT(DISTINCT trade_at::date) FROM trades WHERE account_id = a.id
+        ), 0) AS trading_days
+
       FROM accounts a
       JOIN prop_firms pf ON pf.id = a.prop_firm_id
       LEFT JOIN traders t ON t.id = a.trader_id
@@ -50,38 +56,87 @@ router.get('/', async (req, res) => {
         a.created_at DESC
     `);
 
-    const evolution = {};
-    for (const acc of accounts.rows) {
-      const hist = await query(
-        'SELECT snapshot_at, balance, pnl_today FROM snapshots WHERE account_id = $1 ORDER BY snapshot_at DESC LIMIT 30',
-        [acc.id]
-      );
-      evolution[acc.id] = hist.rows.reverse();
-    }
+    // Para cada cuenta calculamos balance final + trailing DD
+    const enriched = await Promise.all(accounts.rows.map(async (a) => {
+      // balance teorico = size_usd + trades_total - total_payouts
+      const sizeUsd = Number(a.size_usd || 0);
+      const tradesTotal = Number(a.trades_total || 0);
+      const tradesToday = Number(a.trades_today || 0);
+      const totalPayouts = Number(a.total_payouts || 0);
 
-    const enriched = accounts.rows.map((a) => {
-      const last = a.last_snapshot;
+      // Calcular balance final
+      const balance = sizeUsd + tradesTotal - totalPayouts;
+
+      // Trailing DD: balance actual menos max historico (size + cumulative trades por dia)
+      // Calculamos max balance que alcanzó la cuenta
+      const maxBalanceRes = await query(`
+        WITH daily_trades AS (
+          SELECT trade_at::date AS d, SUM(pnl_usd) AS day_pnl
+          FROM trades WHERE account_id = $1
+          GROUP BY trade_at::date
+          ORDER BY trade_at::date
+        ),
+        cumulative AS (
+          SELECT d, SUM(day_pnl) OVER (ORDER BY d) AS cum_pnl
+          FROM daily_trades
+        )
+        SELECT COALESCE(MAX(cum_pnl), 0) AS max_cum
+        FROM cumulative
+      `, [a.id]);
+      const maxCumTrades = Number(maxBalanceRes.rows[0]?.max_cum || 0);
+      const maxHistoricalBalance = sizeUsd + Math.max(maxCumTrades, 0);
+      const trailingDdNow = balance - maxHistoricalBalance;
+
+      // Construir last_snapshot virtual (sin tabla snapshots)
+      const last_snapshot = {
+        balance,
+        equity: balance,
+        pnl_today: tradesToday,
+        pnl_total: tradesTotal,
+        trailing_dd_now: trailingDdNow,
+        best_day_pnl: Number(a.best_day_pnl || 0),
+        trading_days: Number(a.trading_days || 0),
+        snapshot_at: new Date().toISOString()
+      };
+
+      // Alertas
       const alerts = [];
-      if (last && a.status === 'active') {
-        if (a.daily_loss_limit && last.pnl_today < 0) {
-          const pct = Math.abs(last.pnl_today / a.daily_loss_limit) * 100;
+      if (a.status === 'active') {
+        if (a.daily_loss_limit && tradesToday < 0) {
+          const pct = Math.abs(tradesToday / a.daily_loss_limit) * 100;
           if (pct >= 70) alerts.push({ level: pct >= 90 ? 'critical' : 'warning', msg: 'Daily loss ' + pct.toFixed(0) + '%' });
         }
-        if (a.trailing_dd_limit && last.trailing_dd_now) {
-          const pct = Math.abs(last.trailing_dd_now / a.trailing_dd_limit) * 100;
+        if (a.trailing_dd_limit && trailingDdNow < 0) {
+          const pct = Math.abs(trailingDdNow / a.trailing_dd_limit) * 100;
           if (pct >= 80) alerts.push({ level: 'critical', msg: 'Trailing DD ' + pct.toFixed(0) + '%' });
           else if (pct >= 60) alerts.push({ level: 'warning', msg: 'Trailing DD ' + pct.toFixed(0) + '%' });
         }
-        if (last.best_day_pnl && last.pnl_total && last.pnl_total > 0) {
-          const consistencyPct = (last.best_day_pnl / last.pnl_total) * 100;
-          if (consistencyPct > 30) alerts.push({ level: 'warning', msg: 'Best day ' + consistencyPct.toFixed(0) + '%' });
-        }
       }
-      return { ...a, alerts };
-    });
+
+      return { ...a, last_snapshot, alerts };
+    }));
+
+    // Evolution: usamos trades agrupados por día para sparkline
+    const evolution = {};
+    for (const acc of enriched) {
+      const hist = await query(`
+        WITH daily_trades AS (
+          SELECT trade_at::date AS d, SUM(pnl_usd) AS day_pnl
+          FROM trades WHERE account_id = $1
+          GROUP BY trade_at::date
+          ORDER BY trade_at::date DESC LIMIT 30
+        )
+        SELECT d AS snapshot_at, day_pnl AS pnl_today,
+               ${Number(acc.size_usd)} + SUM(day_pnl) OVER (ORDER BY d) AS balance
+        FROM daily_trades
+        ORDER BY d
+      `, [acc.id]);
+      evolution[acc.id] = hist.rows;
+    }
 
     res.json({ accounts: enriched, evolution });
   } catch (err) {
+    console.error('dashboard error:', err);
     res.status(500).json({ error: err.message });
   }
 });

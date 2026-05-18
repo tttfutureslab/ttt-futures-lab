@@ -399,34 +399,9 @@ async function findAccountId(accountLabel) {
 }
 
 async function recomputeAccountSnapshot(accountId, deltaPnl, note = '') {
-  // 1. Obtener ultimo snapshot
-  const lastSnap = await query(`
-    SELECT balance, pnl_today, pnl_total, best_day_pnl, trading_days
-    FROM snapshots WHERE account_id = $1 ORDER BY snapshot_at DESC LIMIT 1
-  `, [accountId]);
-  const prev = lastSnap.rows[0] || { balance: 0, pnl_today: 0, pnl_total: 0, best_day_pnl: 0, trading_days: 1 };
-
-  // 2. Calcular nuevos valores
-  const newBalance = Number(prev.balance || 0) + deltaPnl;
-  const newPnlToday = Number(prev.pnl_today || 0) + deltaPnl;
-  const newPnlTotal = Number(prev.pnl_total || 0) + deltaPnl;
-  const newBestDay = Math.max(Number(prev.best_day_pnl || 0), newPnlToday);
-
-  // 3. Calcular trailing DD: balance actual menos balance MAXIMO historico de la cuenta
-  const maxBalRes = await query(`
-    SELECT MAX(balance) AS max_balance FROM snapshots WHERE account_id = $1
-  `, [accountId]);
-  const maxHistoricalBalance = Math.max(Number(maxBalRes.rows[0]?.max_balance || 0), newBalance);
-  // Trailing DD = diferencia entre balance actual y max historico (negativo si estamos por debajo)
-  const trailingDdNow = newBalance - maxHistoricalBalance;
-
-  // 4. Insertar snapshot con trailing_dd_now incluido
-  await query(`
-    INSERT INTO snapshots (account_id, balance, equity, pnl_today, pnl_total, trailing_dd_now, best_day_pnl, trading_days, notes)
-    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-  `, [accountId, newBalance, newBalance, newPnlToday, newPnlTotal, trailingDdNow, newBestDay, prev.trading_days || 1, note]);
-
-  return { balance: newBalance, pnl_today: newPnlToday, pnl_total: newPnlTotal, trailing_dd_now: trailingDdNow };
+  // NOOP: ya no creamos snapshots automaticos.
+  // El balance se calcula en tiempo real desde trades + payouts en el endpoint del dashboard.
+  return { balance: null, pnl_today: null, pnl_total: null, trailing_dd_now: null };
 }
 
 async function execLogTrade(input) {
