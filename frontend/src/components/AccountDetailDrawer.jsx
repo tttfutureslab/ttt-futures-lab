@@ -1,5 +1,6 @@
 import { useEffect, useState, useRef } from 'react';
 import AccountProgress from './AccountProgress';
+import EditTradeModal from './EditTradeModal';
 import './AccountDetailDrawer.css';
 
 const API = '/api';
@@ -10,6 +11,7 @@ export default function AccountDetailDrawer({ accountId, onClose, onUpdate }) {
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(false);
   const [editForm, setEditForm] = useState({});
+  const [editingTrade, setEditingTrade] = useState(null);
 
   async function load() {
     setLoading(true);
@@ -217,6 +219,7 @@ export default function AccountDetailDrawer({ accountId, onClose, onUpdate }) {
                           <td>{t.quarter || '—'}</td>
                           <td><span className={`result-badge ${t.result}`}>{t.result}</span></td>
                           <td className={`mono-num right ${t.pnl_usd >= 0 ? 'value-pos' : 'value-neg'}`}>{fmt(t.pnl_usd)}</td>
+                          <td style={{ textAlign: "center", width: 32 }}><button onClick={() => setEditingTrade(t)} title="Editar" style={{ background: "transparent", border: "1px solid rgba(255,255,255,0.15)", color: "rgba(255,255,255,0.6)", width: 26, height: 26, borderRadius: 4, cursor: "pointer", fontFamily: "inherit" }}>✎</button></td>
                         </tr>
                       ))}
                     </tbody>
@@ -241,6 +244,14 @@ export default function AccountDetailDrawer({ accountId, onClose, onUpdate }) {
           </div>
         )}
       </div>
+      {editingTrade && (
+        <EditTradeModal
+          trade={editingTrade}
+          onClose={() => setEditingTrade(null)}
+          onSuccess={() => { load(); onUpdate?.(); }}
+        />
+      )}
+
     </>
   );
 }
