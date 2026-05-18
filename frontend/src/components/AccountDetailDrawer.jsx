@@ -1,12 +1,5 @@
 import { useEffect, useState, useRef } from 'react';
 import AccountProgress from './AccountProgress';
-import {
-  EditTradeModal,
-  EditAccountModal,
-  AddTradeModal,
-  AddSnapshotModal,
-  AddPayoutModal
-} from './AdminForms';
 import './AccountDetailDrawer.css';
 
 const API = '/api';
@@ -17,12 +10,6 @@ export default function AccountDetailDrawer({ accountId, onClose, onUpdate }) {
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(false);
   const [editForm, setEditForm] = useState({});
-  const [showEditAccount, setShowEditAccount] = useState(false);
-  const [showAddTrade, setShowAddTrade] = useState(false);
-  const [showAddSnapshot, setShowAddSnapshot] = useState(false);
-  const [showAddPayout, setShowAddPayout] = useState(false);
-  const [editingTrade, setEditingTrade] = useState(null);
-  const [payouts, setPayouts] = useState([]);
 
   async function load() {
     setLoading(true);
@@ -41,37 +28,7 @@ export default function AccountDetailDrawer({ accountId, onClose, onUpdate }) {
     } catch (e) {
       console.error(e);
     }
-    loadPayouts();
     setLoading(false);
-  }
-
-  async function loadPayouts() {
-    try {
-      const r = await fetch(`${API}/admin/accounts/${accountId}/payouts`, { credentials: 'include' });
-      const d = await r.json();
-      setPayouts(d.payouts || []);
-    } catch (e) {}
-  }
-
-  async function deletePayout(id) {
-    if (!confirm('¿Borrar este payout? El balance se revertirá.')) return;
-    await fetch(`${API}/admin/payouts/${id}`, { method: 'DELETE', credentials: 'include' });
-    await load();
-    onUpdate?.();
-  }
-
-  async function deleteTrade(id) {
-    if (!confirm('¿Borrar este trade?')) return;
-    await fetch(`${API}/admin/trades/${id}`, { method: 'DELETE', credentials: 'include' });
-    await load();
-    onUpdate?.();
-  }
-
-  async function deleteSnapshot(id) {
-    if (!confirm('¿Borrar este snapshot?')) return;
-    await fetch(`${API}/admin/snapshots/${id}`, { method: 'DELETE', credentials: 'include' });
-    await load();
-    onUpdate?.();
   }
 
   useEffect(() => {
@@ -197,12 +154,7 @@ export default function AccountDetailDrawer({ accountId, onClose, onUpdate }) {
               </div>
             )}
 
-            {/* Botón editar cuenta arriba */}
-          <div className="drawer-quick-actions">
-            <button className="btn btn-edit-header" onClick={() => setShowEditAccount(true)}>✎ Editar cuenta</button>
-          </div>
-
-          {/* Alertas */}
+            {/* Alertas */}
             {data.alerts.length > 0 && (
               <div className="drawer-section">
                 <h3 className="section-title">⚠ ALERTAS</h3>
@@ -238,10 +190,7 @@ export default function AccountDetailDrawer({ accountId, onClose, onUpdate }) {
 
             {/* Trades de la cuenta */}
             <div className="drawer-section">
-              <div className="section-header-row">
-              <h3 className="section-title">📈 TRADES ({data.trades.length})</h3>
-              <button className="btn-add btn-add-trade" onClick={() => setShowAddTrade(true)}>+ Añadir trade</button>
-            </div>
+              <h3 className="section-title">📋 TRADES ({data.trades.length})</h3>
               {data.trades.length === 0 ? (
                 <p className="empty-text">Aún no hay trades en esta cuenta. Pega capturas en el Chat Trading.</p>
               ) : (
@@ -256,9 +205,8 @@ export default function AccountDetailDrawer({ accountId, onClose, onUpdate }) {
                         <th>Q</th>
                         <th>Resultado</th>
                         <th style={{ textAlign: 'right' }}>PnL</th>
-                    <th className="th-actions-trades" style={{ textAlign: 'center' }}>—</th>
-                  </tr>
-                </thead>
+                      </tr>
+                    </thead>
                     <tbody>
                       {data.trades.map((t) => (
                         <tr key={t.id}>
@@ -269,11 +217,7 @@ export default function AccountDetailDrawer({ accountId, onClose, onUpdate }) {
                           <td>{t.quarter || '—'}</td>
                           <td><span className={`result-badge ${t.result}`}>{t.result}</span></td>
                           <td className={`mono-num right ${t.pnl_usd >= 0 ? 'value-pos' : 'value-neg'}`}>{fmt(t.pnl_usd)}</td>
-                      <td className="td-actions">
-                        <button className="btn-icon btn-edit-trade" onClick={() => setEditingTrade(t)} title="Editar">✎</button>
-                        <button className="btn-icon btn-delete-trade" onClick={() => deleteTrade(t.id)} title="Borrar">🗑</button>
-                      </td>
-                    </tr>
+                        </tr>
                       ))}
                     </tbody>
                   </table>
@@ -283,81 +227,18 @@ export default function AccountDetailDrawer({ accountId, onClose, onUpdate }) {
 
             {/* Snapshots */}
             <div className="drawer-section">
-              <div className="section-header-row">
-              <h3 className="section-title">📍 SNAPSHOTS ({data.snapshots.length})</h3>
-              <button className="btn-add btn-add-snapshot" onClick={() => setShowAddSnapshot(true)}>+ Añadir snapshot</button>
-            </div>
+              <h3 className="section-title">🕐 SNAPSHOTS ({data.snapshots.length})</h3>
               <div className="snapshots-list">
                 {data.snapshots.slice(-10).reverse().map((s) => (
                   <div key={s.id} className="snapshot-row">
                     <span className="snapshot-date">{new Date(s.snapshot_at).toLocaleString().slice(0, 16)}</span>
                     <span className="mono-num">{fmt(s.balance)}</span>
                     <span className={`mono-num ${s.pnl_today >= 0 ? 'value-pos' : 'value-neg'}`}>{fmt(s.pnl_today)}</span>
-                <button className="btn-icon btn-delete-snapshot" onClick={() => deleteSnapshot(s.id)} title="Borrar">🗑</button>
-              </div>
-                ))}
-              </div>
-            </div>
-
-          {/* Payouts */}
-          <div className="drawer-section section-payouts">
-            <div className="section-header-row">
-              <h3 className="section-title">💰 PAYOUTS ({payouts.length})</h3>
-              <button className="btn-add btn-add-payout" onClick={() => setShowAddPayout(true)}>+ Registrar payout</button>
-            </div>
-            {payouts.length === 0 ? (
-              <p className="empty-text">No hay payouts registrados.</p>
-            ) : (
-              <div className="payouts-list">
-                {payouts.map((p) => (
-                  <div key={p.id} className="payout-row">
-                    <span className="payout-date">{new Date(p.payout_date).toLocaleDateString()}</span>
-                    <span className="payout-method">{p.payment_method || '—'}</span>
-                    <span className="mono-num value-pos">{fmt(p.amount_usd)}</span>
-                    <button className="btn-icon btn-delete-payout" onClick={() => deletePayout(p.id)} title="Borrar">🗑</button>
                   </div>
                 ))}
               </div>
-            )}
+            </div>
           </div>
-          </div>
-
-      {editingTrade && (
-        <EditTradeModal
-          trade={editingTrade}
-          onClose={() => setEditingTrade(null)}
-          onSuccess={() => { load(); onUpdate?.(); }}
-        />
-      )}
-      {showEditAccount && (
-        <EditAccountModal
-          account={{ ...data.account, id: accountId, trader_slug: data.account.trader_slug }}
-          onClose={() => setShowEditAccount(false)}
-          onSuccess={() => { load(); onUpdate?.(); }}
-        />
-      )}
-      {showAddTrade && (
-        <AddTradeModal
-          accountId={accountId}
-          onClose={() => setShowAddTrade(false)}
-          onSuccess={() => { load(); onUpdate?.(); }}
-        />
-      )}
-      {showAddSnapshot && (
-        <AddSnapshotModal
-          accountId={accountId}
-          onClose={() => setShowAddSnapshot(false)}
-          onSuccess={() => { load(); onUpdate?.(); }}
-        />
-      )}
-      {showAddPayout && (
-        <AddPayoutModal
-          accountId={accountId}
-          onClose={() => setShowAddPayout(false)}
-          onSuccess={() => { load(); onUpdate?.(); }}
-        />
-      )}
-    
         )}
       </div>
     </>
