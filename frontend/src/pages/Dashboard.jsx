@@ -338,8 +338,11 @@ function AccountRulesBlock({ account }) {
         )}
         {hasDdInfo && (
           <div className="acc-rule-item">
-            <div className="acc-rule-label">DD a breach</div>
-            <div className={`acc-rule-value mono-num ${ddColor}`}>{fmt(account.dd_remaining_usd)}</div>
+            <div className="acc-rule-label">Equity to breach</div>
+            <div className={`acc-rule-value mono-num ${ddColor}`}>{fmt(account.equity_to_breach)}</div>
+            {account.dd_remaining_usd !== null && (
+              <div className="acc-rule-sub">queda {fmt(account.dd_remaining_usd)}</div>
+            )}
           </div>
         )}
         {hasProfitTarget && (

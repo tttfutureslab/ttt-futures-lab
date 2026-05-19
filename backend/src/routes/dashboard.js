@@ -36,6 +36,14 @@ router.get('/', async (req, res) => {
           ) d
         ), 0)::numeric(12,2) AS best_day_pnl,
 
+        -- Suma de PnL solo de dias POSITIVOS (para consistency)
+        COALESCE((
+          SELECT SUM(daily_pnl) FROM (
+            SELECT SUM(pnl_usd) AS daily_pnl FROM trades
+            WHERE account_id = a.id GROUP BY trade_at::date
+          ) d WHERE d.daily_pnl > 0
+        ), 0)::numeric(12,2) AS positive_days_total,
+
         -- Dias unicos operados
         COALESCE((
           SELECT COUNT(DISTINCT trade_at::date) FROM trades WHERE account_id = a.id
@@ -136,8 +144,9 @@ router.get('/', async (req, res) => {
       // 1. Consistencia REAL (best_day / pnl_total)
       let consistency_pct_real = null;
       let consistency_status = null;
-      if (tradesTotal > 0 && bestDayPnl > 0) {
-        consistency_pct_real = (bestDayPnl / tradesTotal) * 100;
+      const positiveDaysTotal = Number(a.positive_days_total || 0);
+      if (positiveDaysTotal > 0 && bestDayPnl > 0) {
+        consistency_pct_real = (bestDayPnl / positiveDaysTotal) * 100;
         if (a.rule_consistency_pct !== null && a.rule_consistency_pct !== undefined) {
           const limit = Number(a.rule_consistency_pct);
           if (consistency_pct_real > limit) consistency_status = 'breach';
@@ -176,7 +185,9 @@ router.get('/', async (req, res) => {
         alerts,
         consistency_pct_real,
         consistency_status,
+        positive_days_total: positiveDaysTotal,
         dd_loss_threshold,
+        equity_to_breach: dd_loss_threshold,
         dd_remaining_usd,
         profit_target_progress_pct,
         profit_target_remaining_usd,
