@@ -10,7 +10,8 @@ const NAV = [
   { to: '/gestion',     label: '💼 GESTIÓN' },
   { to: '/backtesting', label: '🔬 BACKTEST' },
   { to: '/sessions',    label: '🕐 SESIONES' },
-  { to: '/rules',       label: '📚 NORMAS' }
+  { to: '/rules',       label: '📚 NORMAS' },
+  { to: '/news',        label: '📅 NOTICIAS' }
 ];
 
 const TRADER_COLORS = { adri: '#6cd97e', juanka: '#a3c8ff' };

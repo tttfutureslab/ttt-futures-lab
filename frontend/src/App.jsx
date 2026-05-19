@@ -11,6 +11,7 @@ import Dashboard from './pages/Dashboard';
 import ChatTrading from './pages/ChatTrading';
 import ChatGestion from './pages/ChatGestion';
 import ChatBacktesting from './pages/ChatBacktesting';
+import News from './pages/News';
 import Sessions from './pages/Sessions';
 import Rules from './pages/Rules';
 import { getAuthStatus } from './lib/api';
@@ -29,6 +30,7 @@ function AppContent({ onLogout, onSwitchTrader }) {
             <Route path="/backtesting" element={<ChatBacktesting />} />
             <Route path="/sessions"    element={<Sessions />} />
             <Route path="/rules"       element={<Rules />} />
+            <Route path="/news"        element={<News />} />
           </Routes>
         </PageBurjWrapper>
       </main>

@@ -15,6 +15,9 @@ import adminCrudRouter from './routes/adminCrud.js';
 import accountProgressRouter from './routes/accountProgress.js';
 import sessionsStatsRouter from './routes/sessionsStats.js';
 import tradersRouter from './routes/traders.js';
+import economicCalendarRouter from './routes/economicCalendar.js';
+import { fetchAndCacheEvents } from './services/economicCalendar.js';
+import cron from 'node-cron';
 import { requireAuth, isAuthConfigured } from './services/auth.js';
 import { scheduleRulesRefresh } from './services/rulesRefresh.js';
 
@@ -38,6 +41,7 @@ app.use('/api/admin', adminCrudRouter);
 app.use('/api/account-progress', accountProgressRouter);
 app.use('/api/sessions-stats', sessionsStatsRouter);
 app.use('/api/traders', tradersRouter);
+app.use('/api/economic-calendar', economicCalendarRouter);
 
 const frontendDist = path.join(__dirname, '..', '..', 'frontend', 'dist');
 app.use(express.static(frontendDist));
@@ -46,6 +50,32 @@ app.get('*', (req, res) => {
 });
 
 const PORT = process.env.PORT || 3000;
+
+// Cron: descarga eventos económicos de Forex Factory una vez al día (5:00 UTC = 7:00 Madrid)
+cron.schedule('0 5 * * *', async () => {
+  console.log('[cron] Iniciando descarga diaria de Forex Factory...');
+  try {
+    const result = await fetchAndCacheEvents();
+    console.log('[cron] Descarga completa:', result);
+  } catch (err) {
+    console.error('[cron] Error:', err.message);
+  }
+}, { timezone: 'UTC' });
+
+// Al arrancar el servidor, descarga inicial si no hay eventos cacheados
+import { query as dbQuery } from './db/pool.js';
+setTimeout(async () => {
+  try {
+    const r = await dbQuery('SELECT COUNT(*) AS c FROM economic_events WHERE event_at >= NOW()');
+    if (Number(r.rows[0].c) === 0) {
+      console.log('[startup] Sin eventos económicos cacheados, descargando...');
+      await fetchAndCacheEvents();
+    }
+  } catch (err) {
+    console.error('[startup] Error en descarga inicial:', err.message);
+  }
+}, 5000);
+
 app.listen(PORT, () => {
   console.log('TTT Futures Lab running on port ' + PORT);
   console.log(isAuthConfigured() ? 'Auth activada' : 'WARN: APP_PASSWORD no configurada');
