@@ -39,22 +39,11 @@ router.get('/', async (req, res) => {
         -- Dias unicos operados
         COALESCE((
           SELECT COUNT(DISTINCT trade_at::date) FROM trades WHERE account_id = a.id
-        ), 0) AS trading_days,
-
-        -- Reglas del tipo de cuenta (de la tabla account_type_rules)
-        atr.consistency_max_pct AS rule_consistency_pct,
-        atr.min_trading_days AS rule_min_days,
-        atr.profit_target_usd AS rule_profit_target,
-        atr.trailing_dd_usd AS rule_trailing_dd,
-        atr.daily_loss_usd AS rule_daily_loss
+        ), 0) AS trading_days
 
       FROM accounts a
       JOIN prop_firms pf ON pf.id = a.prop_firm_id
       LEFT JOIN traders t ON t.id = a.trader_id
-      LEFT JOIN account_type_rules atr
-        ON atr.firm_slug = pf.slug
-       AND atr.account_type = a.account_type_name
-       AND atr.phase = a.phase
       ORDER BY t.slug,
         CASE a.status
           WHEN 'active' THEN 1
@@ -124,56 +113,7 @@ router.get('/', async (req, res) => {
         }
       }
 
-      // === Cálculos derivados de reglas ===
-      const bestDayPnl = Number(a.best_day_pnl || 0);
-      const tradingDays = Number(a.trading_days || 0);
-
-      let consistency_pct_real = null;
-      let consistency_status = null;
-      if (tradesTotal > 0 && bestDayPnl > 0) {
-        consistency_pct_real = (bestDayPnl / tradesTotal) * 100;
-        if (a.rule_consistency_pct !== null && a.rule_consistency_pct !== undefined) {
-          const limit = Number(a.rule_consistency_pct);
-          if (consistency_pct_real > limit) consistency_status = 'breach';
-          else if (consistency_pct_real > limit * 0.85) consistency_status = 'warn';
-          else consistency_status = 'ok';
-        }
-      }
-
-      const ddLimit = Number(a.rule_trailing_dd || a.trailing_dd_limit || 0);
-      let dd_loss_threshold = null;
-      let dd_remaining_usd = null;
-      if (ddLimit > 0) {
-        dd_loss_threshold = maxHistoricalBalance - ddLimit;
-        dd_remaining_usd = balance - dd_loss_threshold;
-      }
-
-      let profit_target_progress_pct = null;
-      let profit_target_remaining_usd = null;
-      const ptUsd = Number(a.rule_profit_target || a.profit_target || 0);
-      if (ptUsd > 0) {
-        profit_target_progress_pct = (tradesTotal / ptUsd) * 100;
-        profit_target_remaining_usd = Math.max(0, ptUsd - tradesTotal);
-      }
-
-      let days_remaining = null;
-      if (a.rule_min_days !== null && a.rule_min_days !== undefined) {
-        days_remaining = Math.max(0, Number(a.rule_min_days) - tradingDays);
-      }
-
-      return {
-        ...a,
-        last_snapshot,
-        alerts,
-        consistency_pct_real,
-        consistency_status,
-        dd_loss_threshold,
-        dd_remaining_usd,
-        profit_target_progress_pct,
-        profit_target_remaining_usd,
-        days_remaining,
-        max_historical_balance: maxHistoricalBalance
-      };
+      return { ...a, last_snapshot, alerts };
     }));
 
     // Evolution: usamos trades agrupados por día para sparkline

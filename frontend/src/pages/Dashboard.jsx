@@ -271,7 +271,6 @@ function AccountCard({ account, evolution, onClick, compact }) {
         </div>
       )}
 
-      {!compact && <AccountRulesBlock account={account} />}
       {!compact && evolution.length >= 2 && <Sparkline data={evolution} />}
 
       {!compact && <AccountProgress accountId={account.id} compact={true} />}
@@ -283,83 +282,6 @@ function AccountCard({ account, evolution, onClick, compact }) {
           ))}
         </div>
       )}
-    </div>
-  );
-}
-
-function AccountRulesBlock({ account }) {
-  const fmt = (n) => (n === null || n === undefined || isNaN(n))
-    ? '—'
-    : Number(n).toLocaleString('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0, maximumFractionDigits: 0 });
-
-  const hasConsistencyRule = account.rule_consistency_pct !== null && account.rule_consistency_pct !== undefined;
-  const hasDdInfo = account.dd_remaining_usd !== null && account.dd_remaining_usd !== undefined;
-  const hasProfitTarget = account.profit_target_progress_pct !== null && account.profit_target_progress_pct !== undefined;
-  const hasMinDays = account.rule_min_days !== null && account.rule_min_days !== undefined && account.rule_min_days > 0;
-
-  // Si no hay ninguna regla aplicable, no mostramos el bloque
-  if (!hasConsistencyRule && !hasDdInfo && !hasProfitTarget && !hasMinDays) return null;
-
-  const consistencyColor = account.consistency_status === 'breach' ? 'value-neg'
-    : account.consistency_status === 'warn' ? 'value-warn'
-    : 'value-pos';
-
-  const ddColor = (() => {
-    if (!hasDdInfo) return '';
-    const pct = account.rule_trailing_dd > 0 ? (account.dd_remaining_usd / account.rule_trailing_dd) * 100 : 100;
-    if (pct < 20) return 'value-neg';
-    if (pct < 50) return 'value-warn';
-    return 'value-pos';
-  })();
-
-  const daysColor = (() => {
-    if (!hasMinDays) return '';
-    return account.days_remaining > 0 ? 'value-warn' : 'value-pos';
-  })();
-
-  return (
-    <div className="acc-rules-block">
-      <div className="acc-rules-title">REGLAS · {account.account_type_name} · {account.phase}</div>
-      <div className="acc-rules-grid">
-        <div className="acc-rule-item">
-          <div className="acc-rule-label">Best day</div>
-          <div className="acc-rule-value mono-num">{fmt(account.last_snapshot?.best_day_pnl)}</div>
-        </div>
-        {hasConsistencyRule && (
-          <div className="acc-rule-item">
-            <div className="acc-rule-label">Consistencia</div>
-            <div className={`acc-rule-value mono-num ${consistencyColor}`}>
-              {account.consistency_pct_real !== null ? account.consistency_pct_real.toFixed(0) + '%' : '—'}
-              <span className="acc-rule-limit"> / {account.rule_consistency_pct}%</span>
-            </div>
-          </div>
-        )}
-        {hasDdInfo && (
-          <div className="acc-rule-item">
-            <div className="acc-rule-label">DD a breach</div>
-            <div className={`acc-rule-value mono-num ${ddColor}`}>{fmt(account.dd_remaining_usd)}</div>
-          </div>
-        )}
-        {hasProfitTarget && (
-          <div className="acc-rule-item">
-            <div className="acc-rule-label">Profit target</div>
-            <div className={`acc-rule-value mono-num ${account.profit_target_progress_pct >= 100 ? 'value-pos' : ''}`}>
-              {account.profit_target_progress_pct >= 100 ? '✓ ALCANZADO' : account.profit_target_progress_pct.toFixed(0) + '%'}
-            </div>
-            {account.profit_target_progress_pct < 100 && (
-              <div className="acc-rule-sub">Falta {fmt(account.profit_target_remaining_usd)}</div>
-            )}
-          </div>
-        )}
-        {hasMinDays && (
-          <div className="acc-rule-item">
-            <div className="acc-rule-label">Días op.</div>
-            <div className={`acc-rule-value mono-num ${daysColor}`}>
-              {account.trading_days || 0}<span className="acc-rule-limit"> / {account.rule_min_days}</span>
-            </div>
-          </div>
-        )}
-      </div>
     </div>
   );
 }
