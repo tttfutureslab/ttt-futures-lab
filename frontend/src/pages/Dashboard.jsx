@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import './Dashboard.css';
 import AccountDetailDrawer from '../components/AccountDetailDrawer';
+import NewsBanner from '../components/NewsBanner';
 import AccountProgress from '../components/AccountProgress';
 import { CreateAccountModal } from '../components/AdminForms';
 import { getCurrentTrader as _gct } from '../lib/traderContext';
@@ -86,6 +87,7 @@ export default function Dashboard() {
 
   return (
     <div className="dashboard">
+      <NewsBanner />
       {/* Tabs trader filter */}
       <div className="trader-tabs">
         <button className={`trader-tab ${viewMode === 'all' ? 'active' : ''}`} onClick={() => setViewMode('all')}>TODO</button>
