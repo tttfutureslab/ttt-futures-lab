@@ -235,3 +235,38 @@
   letter-spacing: 0.05em;
   color: var(--silver-dim);
 }
+
+/* Preview del PnL calculado en el formulario */
+.tr-pnl-preview {.{env.example,git{,ignore}},README.md,backend,frontend,nixpacks.toml,railway.json} 
+  margin-top: 6px;
+  font-size: 13px;
+  font-weight: 700;
+  font-family: var(--font-mono);
+  padding: 4px 0;
+
+#.tr-pnl-preview.pos {.{env.example,git{,ignore}},README.md,backend,frontend,nixpacks.toml,railway.json}  color: 
+6cd97e; 
+#.tr-pnl-preview.neg {.{env.example,git{,ignore}},README.md,backend,frontend,nixpacks.toml,railway.json}  color: 
+f76b6b; 
+.tr-pnl-preview-sub {.{env.example,git{,ignore}},README.md,backend,frontend,nixpacks.toml,railway.json} 
+  font-size: 10px;
+  font-weight: 400;
+  color: var(--silver-dim);
+  opacity: 0.6;
+
+
+.tr-pnl-preview {
+  margin-top: 6px;
+  font-size: 13px;
+  font-weight: 700;
+  font-family: var(--font-mono);
+  padding: 4px 0;
+}
+.tr-pnl-preview.pos { color: #6cd97e; }
+.tr-pnl-preview.neg { color: #f76b6b; }
+.tr-pnl-preview-sub {
+  font-size: 10px;
+  font-weight: 400;
+  color: var(--silver-dim);
+  opacity: 0.6;
+}

@@ -24,6 +24,7 @@ export default function ChatTrading() {
     direction: 'long',
     result: 'TP',
     pnl_usd: '',
+    balance_now: '',
     session: '',
     quarter: '',
     reason: ''
@@ -72,7 +73,7 @@ export default function ChatTrading() {
   async function handleSubmit(e) {
     e?.preventDefault?.();
     if (!form.account_id) { alert('Selecciona una cuenta'); return; }
-    if (form.pnl_usd === '' || isNaN(Number(form.pnl_usd))) { alert('PnL inválido'); return; }
+    if (form.balance_now === '' || isNaN(Number(form.balance_now))) { alert('Introduce el balance actual de la cuenta'); return; }
     if (!form.session) { alert('Selecciona la sesión (Daily Q)'); return; }
     if (!form.quarter) { alert('Selecciona el cuarto (90-min Q)'); return; }
 
@@ -84,7 +85,7 @@ export default function ChatTrading() {
         direction: form.direction,
         contracts: 1,
         result: form.result,
-        pnl_usd: Number(form.pnl_usd),
+        pnl_usd: Number(form.balance_now) - balanceBefore,
         session: form.session,
         quarter: form.quarter,
         reason: form.reason || null,
@@ -102,7 +103,7 @@ export default function ChatTrading() {
         throw new Error(err.error || 'Error');
       }
       // Reset solo PnL y observaciones (mantener cuenta y dirección)
-      setForm((f) => ({ ...f, pnl_usd: '', reason: '' }));
+      setForm((f) => ({ ...f, pnl_usd: '', balance_now: '', reason: '' }));
       await loadTrades();
     } catch (e) {
       alert('Error: ' + e.message);
@@ -139,6 +140,11 @@ export default function ChatTrading() {
       alert('Error: ' + e.message);
     }
   }
+
+  const selAcc = accounts.find((a) => String(a.id) === String(form.account_id));
+  const balanceBefore = selAcc ? Number(selAcc.last_snapshot?.balance || 0) : 0;
+  const balNow = form.balance_now === "" ? null : Number(form.balance_now);
+  const calcPnl = (balNow !== null && !isNaN(balNow)) ? (balNow - balanceBefore) : null;
 
   if (loading) return <div className="tr-loading">Cargando...</div>;
 
@@ -204,15 +210,21 @@ export default function ChatTrading() {
           </div>
 
           <div className="tr-field tr-pnl">
-            <label>PNL USD</label>
+            <label>BALANCE ACTUAL DE LA CUENTA</label>
             <input
               type="number"
               step="0.01"
-              placeholder="ej: 750 o -250"
-              value={form.pnl_usd}
-              onChange={(e) => setForm({ ...form, pnl_usd: e.target.value })}
+              placeholder={"antes: " + balanceBefore.toFixed(2)}
+              value={form.balance_now}
+              onChange={(e) => setForm({ ...form, balance_now: e.target.value })}
               required
             />
+            {calcPnl !== null && (
+              <div className={"tr-pnl-preview " + (calcPnl >= 0 ? "pos" : "neg")}>
+                Este trade: {calcPnl >= 0 ? "+" : ""}{calcPnl.toFixed(2)} USD
+                <span className="tr-pnl-preview-sub"> (antes: {balanceBefore.toFixed(2)})</span>
+              </div>
+            )}
           </div>
         </div>
 
