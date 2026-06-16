@@ -8,7 +8,8 @@ const FIRMS = [
   { slug: 'topone', name: 'TopOne Futures' },
   { slug: 'tradeify', name: 'Tradeify' },
   { slug: 'mffu', name: 'MyFundedFutures' },
-  { slug: 'apex', name: 'Apex Trader Funding' }
+  { slug: 'apex', name: 'Apex Trader Funding' },
+  { slug: 'lucid', name: 'Lucid Trading' }
 ];
 const TRADERS = [{ slug: 'adri', name: 'ADRI' }, { slug: 'juanka', name: 'JUANKA' }];
 const STATUSES = ['active', 'passed', 'blown', 'paused', 'archived'];

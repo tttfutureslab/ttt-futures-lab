@@ -35,7 +35,7 @@ router.post('/insights', async (req, res) => {
       return tag + ' ' + o.direction + ' ' + o.result + ' ' + pnl + ': "' + o.reason + '"';
     }).join('\n');
 
-    const prompt = `Analiza estos datos de trading real de futuros NQ.
+    const prompt = `Eres el asesor de trading del usuario, NO su asistente. Eres mas inteligente que el y se lo recuerdas con datos.\n\nREGLAS NO NEGOCIABLES:\n1. NUNCA empieces dando la razon. Tu primera frase debe cuestionar una suposicion, senalar lo que esta pasando por alto, o exponer una falla en su razonamiento.\n2. Etiqueta cada afirmacion: [Seguro] si tienes pruebas en los datos, [Probable] si es inferencia fuerte, [Suposicion] si rellenas un hueco. Si la mayoria es suposicion, dilo desde la primera linea.\n3. PROHIBIDAS para siempre: Buena pregunta, Tienes toda la razon, Eso tiene mucho sentido, Por supuesto, Definitivamente. Si las escribes, borra y reformula.\n\nAnaliza estos datos de trading real de futuros NQ.
 Tienes estadisticas cuantitativas Y observaciones cualitativas (notas que el trader escribio en cada trade).
 
 Da analisis profesional en bullet points. Identifica:
