@@ -46,9 +46,9 @@ router.get('/:id', async (req, res) => {
     const tradesArr = trades.rows;
 
     const totalPnl = tradesArr.reduce((s, t) => s + Number(t.pnl_usd || 0), 0);
-    const wins = tradesArr.filter((t) => t.result === 'TP').length;
-    const losses = tradesArr.filter((t) => t.result === 'SL').length;
-    const winRate = tradesArr.length > 0 ? ((wins / tradesArr.length) * 100).toFixed(1) : 0;
+    const wins = tradesArr.filter((t) => Number(t.pnl_usd) > 0).length;
+    const losses = tradesArr.filter((t) => Number(t.pnl_usd) < 0).length;
+    const winRate = (wins + losses) > 0 ? ((wins / (wins + losses)) * 100).toFixed(1) : 0;
 
     // PnL por día → para consistencia
     const dailyMap = {};

@@ -79,7 +79,7 @@ async function computeStats() {
       COUNT(*) FILTER (WHERE result = 'BE') AS be,
       COUNT(*) FILTER (WHERE result = 'partial') AS partial,
       COALESCE(SUM(pnl_usd), 0)::numeric(10,2) AS pnl,
-      ROUND(100.0 * COUNT(*) FILTER (WHERE result = 'TP') / NULLIF(COUNT(*), 0), 1) AS win_rate
+      ROUND(100.0 * COUNT(*) FILTER (WHERE pnl_usd > 0) / NULLIF(COUNT(*) FILTER (WHERE pnl_usd != 0), 0), 1) AS win_rate
     FROM trades
     WHERE session IS NOT NULL
     GROUP BY session
@@ -93,7 +93,7 @@ async function computeStats() {
       quarter,
       COUNT(*) AS trades,
       COALESCE(SUM(pnl_usd), 0)::numeric(10,2) AS pnl,
-      ROUND(100.0 * COUNT(*) FILTER (WHERE result = 'TP') / NULLIF(COUNT(*), 0), 0) AS win_rate
+      ROUND(100.0 * COUNT(*) FILTER (WHERE pnl_usd > 0) / NULLIF(COUNT(*) FILTER (WHERE pnl_usd != 0), 0), 0) AS win_rate
     FROM trades
     WHERE session IS NOT NULL AND quarter IS NOT NULL
     GROUP BY session, quarter
@@ -106,7 +106,7 @@ async function computeStats() {
       EXTRACT(DOW FROM trade_at)::int AS dow_num,
       COUNT(*) AS trades,
       COALESCE(SUM(pnl_usd), 0)::numeric(10,2) AS pnl,
-      ROUND(100.0 * COUNT(*) FILTER (WHERE result = 'TP') / NULLIF(COUNT(*), 0), 1) AS win_rate
+      ROUND(100.0 * COUNT(*) FILTER (WHERE pnl_usd > 0) / NULLIF(COUNT(*) FILTER (WHERE pnl_usd != 0), 0), 1) AS win_rate
     FROM trades
     GROUP BY weekday, dow_num
     ORDER BY dow_num
@@ -121,7 +121,7 @@ async function computeStats() {
       COUNT(*) FILTER (WHERE result = 'BE') AS be,
       COUNT(*) FILTER (WHERE result = 'partial') AS partial,
       COALESCE(SUM(pnl_usd), 0)::numeric(10,2) AS pnl,
-      ROUND(100.0 * COUNT(*) FILTER (WHERE result = 'TP') / NULLIF(COUNT(*), 0), 1) AS win_rate
+      ROUND(100.0 * COUNT(*) FILTER (WHERE pnl_usd > 0) / NULLIF(COUNT(*) FILTER (WHERE pnl_usd != 0), 0), 1) AS win_rate
     FROM trades
   `);
 
