@@ -18,7 +18,7 @@ router.get('/', async (req, res) => {
 
         -- Sumas reales de trades y payouts
         COALESCE((SELECT SUM(pnl_usd) FROM trades WHERE account_id = a.id), 0)::numeric(12,2) AS trades_total,
-        COALESCE((SELECT SUM(pnl_usd) FROM trades WHERE account_id = a.id AND trade_at::date = CURRENT_DATE), 0)::numeric(12,2) AS trades_today,
+        COALESCE((SELECT SUM(pnl_usd) FROM trades WHERE account_id = a.id AND (trade_at AT TIME ZONE 'Europe/Madrid')::date = (NOW() AT TIME ZONE 'Europe/Madrid')::date), 0)::numeric(12,2) AS trades_today,
         COALESCE((SELECT SUM(amount_usd) FROM payouts WHERE account_id = a.id), 0)::numeric(12,2) AS total_payouts,
 
         -- Ultimo snapshot manual (para overrides manuales si existen)
@@ -32,7 +32,7 @@ router.get('/', async (req, res) => {
         COALESCE((
           SELECT MAX(daily_pnl) FROM (
             SELECT SUM(pnl_usd) AS daily_pnl FROM trades
-            WHERE account_id = a.id GROUP BY trade_at::date
+            WHERE account_id = a.id GROUP BY (trade_at AT TIME ZONE 'Europe/Madrid')::date
           ) d
         ), 0)::numeric(12,2) AS best_day_pnl,
 
@@ -40,13 +40,13 @@ router.get('/', async (req, res) => {
         COALESCE((
           SELECT SUM(daily_pnl) FROM (
             SELECT SUM(pnl_usd) AS daily_pnl FROM trades
-            WHERE account_id = a.id GROUP BY trade_at::date
+            WHERE account_id = a.id GROUP BY (trade_at AT TIME ZONE 'Europe/Madrid')::date
           ) d WHERE d.daily_pnl > 0
         ), 0)::numeric(12,2) AS positive_days_total,
 
         -- Dias unicos operados
         COALESCE((
-          SELECT COUNT(DISTINCT trade_at::date) FROM trades WHERE account_id = a.id
+          SELECT COUNT(DISTINCT (trade_at AT TIME ZONE 'Europe/Madrid')::date) FROM trades WHERE account_id = a.id
         ), 0) AS trading_days,
 
         -- Reglas del tipo de cuenta (account_type_rules creada en migración 005)
@@ -95,10 +95,10 @@ router.get('/', async (req, res) => {
       // Calculamos max balance que alcanzó la cuenta
       const maxBalanceRes = await query(`
         WITH daily_trades AS (
-          SELECT trade_at::date AS d, SUM(pnl_usd) AS day_pnl
+          SELECT (trade_at AT TIME ZONE 'Europe/Madrid')::date AS d, SUM(pnl_usd) AS day_pnl
           FROM trades WHERE account_id = $1
-          GROUP BY trade_at::date
-          ORDER BY trade_at::date
+          GROUP BY (trade_at AT TIME ZONE 'Europe/Madrid')::date
+          ORDER BY (trade_at AT TIME ZONE 'Europe/Madrid')::date
         ),
         cumulative AS (
           SELECT d, SUM(day_pnl) OVER (ORDER BY d) AS cum_pnl
@@ -201,10 +201,10 @@ router.get('/', async (req, res) => {
     for (const acc of enriched) {
       const hist = await query(`
         WITH daily_trades AS (
-          SELECT trade_at::date AS d, SUM(pnl_usd) AS day_pnl
+          SELECT (trade_at AT TIME ZONE 'Europe/Madrid')::date AS d, SUM(pnl_usd) AS day_pnl
           FROM trades WHERE account_id = $1
-          GROUP BY trade_at::date
-          ORDER BY trade_at::date DESC LIMIT 30
+          GROUP BY (trade_at AT TIME ZONE 'Europe/Madrid')::date
+          ORDER BY (trade_at AT TIME ZONE 'Europe/Madrid')::date DESC LIMIT 30
         )
         SELECT d AS snapshot_at, day_pnl AS pnl_today,
                ${Number(acc.size_usd)} + SUM(day_pnl) OVER (ORDER BY d) AS balance

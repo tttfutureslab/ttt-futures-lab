@@ -16,15 +16,15 @@ router.get('/stats', async (req, res) => {
         t.slug AS trader,
         t.display_name AS trader_name,
         t.color,
-        COALESCE(SUM(CASE WHEN tr.trade_at::date = CURRENT_DATE THEN tr.pnl_usd ELSE 0 END), 0)::numeric(12,2) AS pnl_day,
-        COALESCE(SUM(CASE WHEN tr.trade_at >= date_trunc('week', CURRENT_DATE) THEN tr.pnl_usd ELSE 0 END), 0)::numeric(12,2) AS pnl_week,
-        COALESCE(SUM(CASE WHEN tr.trade_at >= date_trunc('month', CURRENT_DATE) THEN tr.pnl_usd ELSE 0 END), 0)::numeric(12,2) AS pnl_month,
-        COALESCE(SUM(CASE WHEN tr.trade_at >= date_trunc('year', CURRENT_DATE) THEN tr.pnl_usd ELSE 0 END), 0)::numeric(12,2) AS pnl_year,
+        COALESCE(SUM(CASE WHEN (tr.trade_at AT TIME ZONE 'Europe/Madrid')::date = (NOW() AT TIME ZONE 'Europe/Madrid')::date THEN tr.pnl_usd ELSE 0 END), 0)::numeric(12,2) AS pnl_day,
+        COALESCE(SUM(CASE WHEN tr.trade_at >= (date_trunc('week', NOW() AT TIME ZONE 'Europe/Madrid') AT TIME ZONE 'Europe/Madrid') THEN tr.pnl_usd ELSE 0 END), 0)::numeric(12,2) AS pnl_week,
+        COALESCE(SUM(CASE WHEN tr.trade_at >= (date_trunc('month', NOW() AT TIME ZONE 'Europe/Madrid') AT TIME ZONE 'Europe/Madrid') THEN tr.pnl_usd ELSE 0 END), 0)::numeric(12,2) AS pnl_month,
+        COALESCE(SUM(CASE WHEN tr.trade_at >= (date_trunc('year', NOW() AT TIME ZONE 'Europe/Madrid') AT TIME ZONE 'Europe/Madrid') THEN tr.pnl_usd ELSE 0 END), 0)::numeric(12,2) AS pnl_year,
         COALESCE(SUM(tr.pnl_usd), 0)::numeric(12,2) AS pnl_total_all_time,
-        COUNT(tr.id) FILTER (WHERE tr.trade_at::date = CURRENT_DATE) AS trades_day,
-        COUNT(tr.id) FILTER (WHERE tr.trade_at >= date_trunc('week', CURRENT_DATE)) AS trades_week,
-        COUNT(tr.id) FILTER (WHERE tr.trade_at >= date_trunc('month', CURRENT_DATE)) AS trades_month,
-        COUNT(tr.id) FILTER (WHERE tr.trade_at >= date_trunc('year', CURRENT_DATE)) AS trades_year
+        COUNT(tr.id) FILTER (WHERE (tr.trade_at AT TIME ZONE 'Europe/Madrid')::date = (NOW() AT TIME ZONE 'Europe/Madrid')::date) AS trades_day,
+        COUNT(tr.id) FILTER (WHERE tr.trade_at >= (date_trunc('week', NOW() AT TIME ZONE 'Europe/Madrid') AT TIME ZONE 'Europe/Madrid')) AS trades_week,
+        COUNT(tr.id) FILTER (WHERE tr.trade_at >= (date_trunc('month', NOW() AT TIME ZONE 'Europe/Madrid') AT TIME ZONE 'Europe/Madrid')) AS trades_month,
+        COUNT(tr.id) FILTER (WHERE tr.trade_at >= (date_trunc('year', NOW() AT TIME ZONE 'Europe/Madrid') AT TIME ZONE 'Europe/Madrid')) AS trades_year
       FROM traders t
       LEFT JOIN trades tr ON COALESCE(tr.trader_id, (SELECT trader_id FROM accounts WHERE id = tr.account_id)) = t.id
       GROUP BY t.id, t.slug, t.display_name, t.color
@@ -36,10 +36,10 @@ router.get('/stats', async (req, res) => {
       SELECT
         t.slug AS trader,
         COALESCE(SUM(p.amount_usd), 0)::numeric(12,2) AS payouts_total,
-        COALESCE(SUM(CASE WHEN p.payout_date = CURRENT_DATE THEN p.amount_usd ELSE 0 END), 0)::numeric(12,2) AS payouts_day,
-        COALESCE(SUM(CASE WHEN p.payout_date >= date_trunc('week', CURRENT_DATE) THEN p.amount_usd ELSE 0 END), 0)::numeric(12,2) AS payouts_week,
-        COALESCE(SUM(CASE WHEN p.payout_date >= date_trunc('month', CURRENT_DATE) THEN p.amount_usd ELSE 0 END), 0)::numeric(12,2) AS payouts_month,
-        COALESCE(SUM(CASE WHEN p.payout_date >= date_trunc('year', CURRENT_DATE) THEN p.amount_usd ELSE 0 END), 0)::numeric(12,2) AS payouts_year,
+        COALESCE(SUM(CASE WHEN p.payout_date = (NOW() AT TIME ZONE 'Europe/Madrid')::date THEN p.amount_usd ELSE 0 END), 0)::numeric(12,2) AS payouts_day,
+        COALESCE(SUM(CASE WHEN p.payout_date >= date_trunc('week', (NOW() AT TIME ZONE 'Europe/Madrid')::date)::date THEN p.amount_usd ELSE 0 END), 0)::numeric(12,2) AS payouts_week,
+        COALESCE(SUM(CASE WHEN p.payout_date >= date_trunc('month', (NOW() AT TIME ZONE 'Europe/Madrid')::date)::date THEN p.amount_usd ELSE 0 END), 0)::numeric(12,2) AS payouts_month,
+        COALESCE(SUM(CASE WHEN p.payout_date >= date_trunc('year', (NOW() AT TIME ZONE 'Europe/Madrid')::date)::date THEN p.amount_usd ELSE 0 END), 0)::numeric(12,2) AS payouts_year,
         COUNT(p.id) AS payouts_count
       FROM traders t
       LEFT JOIN payouts p ON p.trader_id = t.id
