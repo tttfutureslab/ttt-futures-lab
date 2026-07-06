@@ -9,12 +9,13 @@ const FIRMS = [
   { slug: 'tradeify', name: 'Tradeify' },
   { slug: 'mffu', name: 'MyFundedFutures' },
   { slug: 'apex', name: 'Apex Trader Funding' },
-  { slug: 'lucid', name: 'Lucid Trading' }
+  { slug: 'lucid', name: 'Lucid Trading' },
+  { slug: 'earn2trade', name: 'Earn2Trade' }
 ];
 const TRADERS = [{ slug: 'adri', name: 'ADRI' }, { slug: 'juanka', name: 'JUANKA' }];
 const STATUSES = ['active', 'passed', 'blown', 'paused', 'archived'];
 const PHASES = ['challenge', 'funded'];
-const TYPES = ['elite_daily', 'elite_access', 'elite_static', 'growth', 'select', 'select_flex', 'flex', 'starter', 'expert', 'eod'];
+const TYPES = ['elite_daily', 'elite_access', 'elite_static', 'growth', 'select', 'select_flex', 'flex', 'starter', 'expert', 'eod', 'gauntlet_mini'];
 const SESSIONS = ['Asia', 'London', 'NY AM', 'NY PM'];
 const QUARTERS = ['Q1', 'Q2', 'Q3', 'Q4'];
 const RESULTS = ['TP', 'SL', 'BE', 'partial'];
