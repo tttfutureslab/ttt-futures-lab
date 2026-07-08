@@ -100,7 +100,7 @@ export function CreateAccountModal({ onClose, onSuccess, defaultTrader }) {
       <div className="form-grid-3">
         <div className="form-row">
           <label>Tamaño USD</label>
-          <input type="number" value={form.size_usd} onChange={(e) => setForm({ ...form, size_usd: Number(e.target.value) })} />
+          <select value={form.size_usd || ''} onChange={(e) => setForm({ ...form, size_usd: Number(e.target.value) })}><option value=''>— Elige tamaño —</option><option value='25000'>$25,000</option><option value='50000'>$50,000</option><option value='100000'>$100,000</option><option value='150000'>$150,000</option><option value='200000'>$200,000</option></select>
         </div>
         <div className="form-row">
           <label>Daily loss</label>
@@ -111,6 +111,7 @@ export function CreateAccountModal({ onClose, onSuccess, defaultTrader }) {
           <input type="number" value={form.trailing_dd} onChange={(e) => setForm({ ...form, trailing_dd: Number(e.target.value) })} />
         </div>
       </div>
+      <RulesPreview firm={form.prop_firm_slug} type={form.account_type_name} size={form.size_usd} phase={form.phase} />
       <div className="form-actions">
         <button className="btn" onClick={onClose}>Cancelar</button>
         <button className="btn btn-primary" onClick={save} disabled={saving}>{saving ? 'Guardando...' : 'Crear cuenta'}</button>
