@@ -54,6 +54,15 @@ export function CreateAccountModal({ onClose, onSuccess, defaultTrader }) {
     setSaving(false);
   }
 
+  function handleRulesLoaded(rules) {
+    if (!rules) return;
+    setForm(f => ({
+      ...f,
+      daily_loss: rules.daily_loss ? Number(rules.daily_loss) : f.daily_loss,
+      trailing_dd: rules.trailing_dd ? Number(rules.trailing_dd) : f.trailing_dd
+    }));
+  }
+
   return (
     <Modal title="➕ NUEVA CUENTA" onClose={onClose} size="medium">
       <div className="form-grid-2">
@@ -112,7 +121,7 @@ export function CreateAccountModal({ onClose, onSuccess, defaultTrader }) {
           <input type="number" value={form.trailing_dd} onChange={(e) => setForm({ ...form, trailing_dd: Number(e.target.value) })} />
         </div>
       </div>
-      <RulesPreview firm={form.prop_firm_slug} type={form.account_type_name} size={form.size_usd} phase={form.phase} />
+      <RulesPreview firm={form.prop_firm_slug} type={form.account_type_name} size={form.size_usd} phase={form.phase} onRulesLoaded={handleRulesLoaded} />
       <div className="form-actions">
         <button className="btn" onClick={onClose}>Cancelar</button>
         <button className="btn btn-primary" onClick={save} disabled={saving}>{saving ? 'Guardando...' : 'Crear cuenta'}</button>

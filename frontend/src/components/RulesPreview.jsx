@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 
 const fmt = (n) => n ? '$' + Number(n).toLocaleString() : null;
 
-export default function RulesPreview({ firm, type, size, phase }) {
+export default function RulesPreview({ firm, type, size, phase, onRulesLoaded }) {
   const [rules, setRules] = useState(null);
   const [loading, setLoading] = useState(false);
 
