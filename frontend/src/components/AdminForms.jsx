@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import Modal from './Modal';
+import RulesPreview from './RulesPreview';
 
 const API = '/api';
 

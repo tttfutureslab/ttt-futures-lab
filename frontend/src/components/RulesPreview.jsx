@@ -44,3 +44,4 @@ export default function RulesPreview({ firm, type, size, phase }) {
     </div>
   );
 }
+// rebuild Wed Jul  8 02:50:10     2026
