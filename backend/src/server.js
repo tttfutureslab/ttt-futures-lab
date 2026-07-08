@@ -17,7 +17,6 @@ import sessionsStatsRouter from './routes/sessionsStats.js';
 import tradersRouter from './routes/traders.js';
 import economicCalendarRouter from './routes/economicCalendar.js';
 import debugStateRouter from './routes/debugState.js';
-import accountRulesRouter from './routes/accountRules.js';
 import { fetchAndCacheEvents } from './services/economicCalendar.js';
 import cron from 'node-cron';
 import { requireAuth, isAuthConfigured } from './services/auth.js';
@@ -45,7 +44,6 @@ app.use('/api/sessions-stats', sessionsStatsRouter);
 app.use('/api/traders', tradersRouter);
 app.use('/api/economic-calendar', economicCalendarRouter);
 app.use('/api/debug-state', debugStateRouter);
-app.use('/api/account-rules', accountRulesRouter);
 
 const frontendDist = path.join(__dirname, '..', '..', 'frontend', 'dist');
 app.use(express.static(frontendDist));

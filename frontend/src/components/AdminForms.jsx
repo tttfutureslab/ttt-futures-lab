@@ -22,17 +22,6 @@ const RESULTS = ['TP', 'SL', 'BE', 'partial'];
 
 // ════ CREAR CUENTA ════
 export function CreateAccountModal({ onClose, onSuccess, defaultTrader }) {
-  const [rulesPreview, setRulesPreview] = useState(null);
-    const [loadingRules, setLoadingRules] = useState(false);
-    useEffect(() => {
-      const { prop_firm_slug, account_type_name, size_usd, phase } = form;
-      if (!prop_firm_slug || !account_type_name || !size_usd || !phase) { setRulesPreview(null); return; }
-      setLoadingRules(true);
-      fetch('/api/account-rules?firm=' + prop_firm_slug + '&type=' + account_type_name + '&size=' + size_usd + '&phase=' + phase, { credentials: 'include' })
-        .then(r => r.json())
-        .then(j => { setRulesPreview(j.rules || null); setLoadingRules(false); })
-        .catch(() => { setRulesPreview(null); setLoadingRules(false); });
-    }, [form.prop_firm_slug, form.account_type_name, form.size_usd, form.phase]);
   const [form, setForm] = useState({
     prop_firm_slug: 'topone',
     trader_slug: defaultTrader || 'adri',
@@ -111,14 +100,7 @@ export function CreateAccountModal({ onClose, onSuccess, defaultTrader }) {
       <div className="form-grid-3">
         <div className="form-row">
           <label>Tamaño USD</label>
-          <select value={form.size_usd || ''} onChange={(e) => setForm({ ...form, size_usd: Number(e.target.value) })}>
-            <option value=''>— Elige tamaño —</option>
-            <option value='25000'>$25,000</option>
-            <option value='50000'>$50,000</option>
-            <option value='100000'>$100,000</option>
-            <option value='150000'>$150,000</option>
-            <option value='200000'>$200,000</option>
-          </select>
+          <input type="number" value={form.size_usd} onChange={(e) => setForm({ ...form, size_usd: Number(e.target.value) })} />
         </div>
         <div className="form-row">
           <label>Daily loss</label>
@@ -129,22 +111,7 @@ export function CreateAccountModal({ onClose, onSuccess, defaultTrader }) {
           <input type="number" value={form.trailing_dd} onChange={(e) => setForm({ ...form, trailing_dd: Number(e.target.value) })} />
         </div>
       </div>
-      {rulesPreview && (
-        <div style={{background:"rgba(255,255,255,0.03)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:8,padding:"12px 14px",marginBottom:12,fontSize:12}}>
-          <div style={{color:"rgba(255,255,255,0.5)",fontSize:10,letterSpacing:"0.2em",marginBottom:8,fontWeight:700}}>REGLAS DETECTADAS</div>
-          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit, minmax(130px, 1fr))",gap:8}}>
-            {rulesPreview.trailing_dd && <div><span style={{color:"rgba(255,255,255,0.4)",fontSize:9}}>TRAILING DD</span><br/><b style={{color:"#f76b6b"}}>${Number(rulesPreview.trailing_dd).toLocaleString()}</b></div>}
-            {rulesPreview.daily_loss && <div><span style={{color:"rgba(255,255,255,0.4)",fontSize:9}}>DLL</span><br/><b style={{color:"#f7c66b"}}>${Number(rulesPreview.daily_loss).toLocaleString()}</b></div>}
-            {rulesPreview.profit_target && <div><span style={{color:"rgba(255,255,255,0.4)",fontSize:9}}>PROFIT TARGET</span><br/><b style={{color:"#6cd97e"}}>${Number(rulesPreview.profit_target).toLocaleString()}</b></div>}
-            {rulesPreview.consistency_pct && <div><span style={{color:"rgba(255,255,255,0.4)",fontSize:9}}>CONSISTENCY</span><br/><b style={{color:"#f7c66b"}}>{rulesPreview.consistency_pct}%</b></div>}
-            {rulesPreview.min_trading_days > 0 && <div><span style={{color:"rgba(255,255,255,0.4)",fontSize:9}}>MIN DIAS</span><br/><b>{rulesPreview.min_trading_days}</b></div>}
-            {rulesPreview.payout_split_pct && <div><span style={{color:"rgba(255,255,255,0.4)",fontSize:9}}>SPLIT</span><br/><b style={{color:"#6cd97e"}}>{rulesPreview.payout_split_pct}%</b></div>}
-          </div>
-          {rulesPreview.notes && <div style={{marginTop:8,color:"rgba(255,255,255,0.3)",fontSize:9,fontStyle:"italic"}}>{rulesPreview.notes}</div>}
-        </div>
-        )}
-        {loadingRules && <div style={{fontSize:10,color:"rgba(255,255,255,0.3)",marginBottom:8}}>Buscando reglas...</div>}
-        <div className="form-actions">
+      <div className="form-actions">
         <button className="btn" onClick={onClose}>Cancelar</button>
         <button className="btn btn-primary" onClick={save} disabled={saving}>{saving ? 'Guardando...' : 'Crear cuenta'}</button>
       </div>
