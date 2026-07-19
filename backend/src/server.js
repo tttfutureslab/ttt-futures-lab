@@ -21,7 +21,8 @@ import accountRulesRouter from './routes/accountRules.js';
 import { fetchAndCacheEvents } from './services/economicCalendar.js';
 import cron from 'node-cron';
 import { requireAuth, isAuthConfigured } from './services/auth.js';
-import { scheduleRulesRefresh } from './services/rulesRefresh.js';
+// DISABLED: rulesRefresh usa web_search diario y es caro. Reglas ya en account_type_rules.
+// import { scheduleRulesRefresh } from './services/rulesRefresh.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -83,5 +84,5 @@ setTimeout(async () => {
 app.listen(PORT, () => {
   console.log('TTT Futures Lab running on port ' + PORT);
   console.log(isAuthConfigured() ? 'Auth activada' : 'WARN: APP_PASSWORD no configurada');
-  if (process.env.ANTHROPIC_API_KEY) scheduleRulesRefresh();
+  // if (process.env.ANTHROPIC_API_KEY) scheduleRulesRefresh(); // DISABLED
 });
