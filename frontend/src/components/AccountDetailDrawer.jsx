@@ -137,6 +137,11 @@ export default function AccountDetailDrawer({ accountId, onClose, onUpdate }) {
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
                 <h3 className="section-title">📊 MÉTRICAS</h3>
                 <button
+                  onClick={() => setShowPayoutModal(true)}
+                  title="Cobrar payout"
+                  style={{background:'rgba(108,217,126,0.08)',border:'1px solid rgba(108,217,126,0.3)',color:'#6cd97e',padding:'6px 12px',borderRadius:6,fontFamily:'inherit',fontSize:10,letterSpacing:'0.15em',fontWeight:700,cursor:'pointer',marginRight:6}}
+                >COBRAR</button>
+                <button
                   onClick={() => setShowAdjustBalance(true)}
                   title="Ajustar saldo manualmente"
                   style={{
@@ -279,6 +284,14 @@ export default function AccountDetailDrawer({ accountId, onClose, onUpdate }) {
           </div>
         )}
       </div>
+      {showPayoutModal && (
+        <PayoutModal
+          accountId={accountId}
+          accountData={data && data.account}
+          onClose={() => setShowPayoutModal(false)}
+          onSuccess={() => { load(); onUpdate && onUpdate(); }}
+        />
+      )}
       {showAdjustBalance && (
         <AddSnapshotModal
           accountId={accountId}
