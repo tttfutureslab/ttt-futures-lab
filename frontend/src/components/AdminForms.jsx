@@ -11,7 +11,8 @@ const FIRMS = [
   { slug: 'mffu', name: 'MyFundedFutures' },
   { slug: 'apex', name: 'Apex Trader Funding' },
   { slug: 'lucid', name: 'Lucid Trading' },
-  { slug: 'earn2trade', name: 'Earn2Trade' }
+  { slug: 'earn2trade', name: 'Earn2Trade' },
+  { slug: 'nys', name: 'NYS Markets' }
 ];
 const TRADERS = [{ slug: 'adri', name: 'ADRI' }, { slug: 'juanka', name: 'JUANKA' }];
 const STATUSES = ['active', 'passed', 'blown', 'paused', 'archived'];
