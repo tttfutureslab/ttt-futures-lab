@@ -14,6 +14,7 @@ export default function AccountDetailDrawer({ accountId, onClose, onUpdate }) {
   const [editForm, setEditForm] = useState({});
   const [editingTrade, setEditingTrade] = useState(null);
   const [showAdjustBalance, setShowAdjustBalance] = useState(false);
+  const [showPayoutModal, setShowPayoutModal] = useState(false);
 
   async function load() {
     setLoading(true);
