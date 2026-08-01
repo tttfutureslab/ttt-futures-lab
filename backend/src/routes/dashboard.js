@@ -160,7 +160,14 @@ router.get('/', async (req, res) => {
       let dd_loss_threshold = null;
       let dd_remaining_usd = null;
       if (ddLimit > 0) {
-        dd_loss_threshold = maxHistoricalBalance - ddLimit;
+        const lockAt = Number(a.rule_lock_at || 0);
+        if (lockAt > 0 && maxHistoricalBalance >= lockAt) {
+          // DD lockeado: floor fijo = lock_point - trailing_dd (nunca sube)
+          dd_loss_threshold = lockAt - ddLimit;
+        } else {
+          // DD trailing normal: floor = max_balance - trailing_dd
+          dd_loss_threshold = maxHistoricalBalance - ddLimit;
+        }
         dd_remaining_usd = balance - dd_loss_threshold;
       }
 
