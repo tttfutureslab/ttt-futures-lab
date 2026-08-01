@@ -2,6 +2,7 @@ import { useEffect, useState, useRef } from 'react';
 import AccountProgress from './AccountProgress';
 import EditTradeModal from './EditTradeModal';
 import { AddSnapshotModal } from './AdminForms';
+import PayoutModal from './PayoutModal';
 import './AccountDetailDrawer.css';
 
 const API = '/api';
