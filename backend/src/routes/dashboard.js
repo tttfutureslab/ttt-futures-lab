@@ -56,6 +56,7 @@ router.get('/', async (req, res) => {
         atr.trailing_dd AS rule_trailing_dd,
         atr.daily_loss AS rule_daily_loss,
         atr.drawdown_lock_at_balance AS rule_lock_at,
+        atr.safety_net AS rule_safety_net,
         atr.payout_split_pct AS rule_payout_split,
         atr.min_payout_amount AS rule_min_payout
 
@@ -126,15 +127,12 @@ router.get('/', async (req, res) => {
       // Alertas
       const alerts = [];
       if (a.status === 'active') {
-        if (a.daily_loss_limit && tradesToday < 0) {
-          const pct = Math.abs(tradesToday / a.daily_loss_limit) * 100;
+        const dllLimit = Number(a.rule_daily_loss || a.daily_loss_limit || 0);
+        if (dllLimit > 0 && tradesToday < 0) {
+          const pct = Math.abs(tradesToday / dllLimit) * 100;
           if (pct >= 70) alerts.push({ level: pct >= 90 ? 'critical' : 'warning', msg: 'Daily loss ' + pct.toFixed(0) + '%' });
         }
-        if (a.trailing_dd_limit && trailingDdNow < 0) {
-          const pct = Math.abs(trailingDdNow / a.trailing_dd_limit) * 100;
-          if (pct >= 80) alerts.push({ level: 'critical', msg: 'Trailing DD ' + pct.toFixed(0) + '%' });
-          else if (pct >= 60) alerts.push({ level: 'warning', msg: 'Trailing DD ' + pct.toFixed(0) + '%' });
-        }
+        // Alerta de proximidad al floor: se calcula abajo, con dd_remaining_usd
       }
 
       // === Cálculos derivados de reglas ===
@@ -161,14 +159,23 @@ router.get('/', async (req, res) => {
       let dd_remaining_usd = null;
       if (ddLimit > 0) {
         const lockAt = Number(a.rule_lock_at || 0);
+        const safetyNet = Number(a.rule_safety_net || 0);
         if (lockAt > 0 && maxHistoricalBalance >= lockAt) {
-          // DD lockeado: floor fijo = lock_point - trailing_dd (nunca sube)
-          dd_loss_threshold = lockAt - ddLimit;
+          // DD lockeado: floor fijo permanente. safety_net es el suelo real
+          // publicado por la prop firm. La resta es solo fallback.
+          dd_loss_threshold = safetyNet > 0 ? safetyNet : (lockAt - ddLimit);
         } else {
           // DD trailing normal: floor = max_balance - trailing_dd
           dd_loss_threshold = maxHistoricalBalance - ddLimit;
         }
         dd_remaining_usd = balance - dd_loss_threshold;
+
+        // Alerta por colchon real consumido, no por trailing DD
+        if (a.status === 'active' && dd_remaining_usd !== null) {
+          const usedPct = (1 - (dd_remaining_usd / ddLimit)) * 100;
+          if (usedPct >= 80) alerts.push({ level: 'critical', msg: 'Margen a breach ' + Math.max(0, dd_remaining_usd).toFixed(0) + ' USD' });
+          else if (usedPct >= 60) alerts.push({ level: 'warning', msg: 'Margen a breach ' + Math.max(0, dd_remaining_usd).toFixed(0) + ' USD' });
+        }
       }
 
       // 3. Avance hacia profit target
